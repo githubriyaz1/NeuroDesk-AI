@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: neurodesk_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neurodesk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurodesk_secret_password}
+      POSTGRES_DB: ${POSTGRES_DB:-neurodesk_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurodesk} -d ${POSTGRES_DB:-neurodesk_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: neurodesk_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - API_V1_STR=/api/v1
+      - PROJECT_NAME=NeuroDesk AI
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-neurodesk}:${POSTGRES_PASSWORD:-neurodesk_secret_password}@postgres:5432/${POSTGRES_DB:-neurodesk_db}
+      - SECRET_KEY=${SECRET_KEY:-super_secret_jwt_key_neurodesk_2026_enterprise}
+      - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173","http://localhost:80"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: neurodesk_frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
