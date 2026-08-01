@@ -5,6 +5,7 @@ from app.models.ai_studio import AIModel
 from app.models.project_generator import ProjectBlueprint
 from app.models.workflow import Workflow
 from app.models.chat import ChatSession
+from app.models.asset import Asset, AssetStatus, AssetType
 
 __all__ = [
     "User",
@@ -14,4 +15,7 @@ __all__ = [
     "ProjectBlueprint",
     "Workflow",
     "ChatSession",
+    "Asset",
+    "AssetStatus",
+    "AssetType",
 ]

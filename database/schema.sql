@@ -1,5 +1,5 @@
 -- NeuroDesk AI Initial DDL PostgreSQL Schema
--- Version: 1.1.0 (Includes Enterprise Authentication & Session Revocation)
+-- Version: 1.2.0 (Includes Core Asset Management System - DAMS)
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -24,6 +24,29 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     revoked BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Assets Table (Digital Asset Management System - DAMS)
+CREATE TABLE IF NOT EXISTS assets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    original_filename VARCHAR(255) NOT NULL,
+    description TEXT,
+    asset_type VARCHAR(50) NOT NULL DEFAULT 'DOCUMENT',
+    mime_type VARCHAR(100) NOT NULL,
+    extension VARCHAR(50) NOT NULL,
+    file_size BIGINT NOT NULL DEFAULT 0,
+    checksum VARCHAR(64) NOT NULL,
+    storage_provider VARCHAR(50) NOT NULL DEFAULT 'local',
+    storage_path VARCHAR(512) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'CREATED',
+    version INT NOT NULL DEFAULT 1,
+    is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Workspaces (Data & Documents)
@@ -88,6 +111,13 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_revoked ON refresh_tokens(user_id, revoked);
+CREATE INDEX IF NOT EXISTS idx_assets_owner ON assets(owner_id);
+CREATE INDEX IF NOT EXISTS idx_assets_status ON assets(status);
+CREATE INDEX IF NOT EXISTS idx_assets_type ON assets(asset_type);
+CREATE INDEX IF NOT EXISTS idx_assets_is_favorite ON assets(is_favorite);
+CREATE INDEX IF NOT EXISTS idx_assets_is_deleted ON assets(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_assets_owner_deleted ON assets(owner_id, is_deleted);
+CREATE INDEX IF NOT EXISTS idx_assets_owner_favorite ON assets(owner_id, is_favorite);
 CREATE INDEX IF NOT EXISTS idx_workspaces_owner ON workspaces(owner_id);
 CREATE INDEX IF NOT EXISTS idx_ai_models_owner ON ai_models(owner_id);
 CREATE INDEX IF NOT EXISTS idx_project_blueprints_owner ON project_blueprints(owner_id);

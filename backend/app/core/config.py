@@ -18,6 +18,36 @@ class Settings(BaseSettings):
     # PostgreSQL connection string
     DATABASE_URL: str = "postgresql+asyncpg://neurodesk:neurodesk_secret_password@localhost:5432/neurodesk_db"
     
+    # DAMS Core Configuration
+    STORAGE_LOCAL_ROOT: str = "storage/uploads"
+    STORAGE_TEMP_DIR: str = "storage/temp"
+    DEFAULT_STORAGE_PROVIDER: str = "local"
+    MAX_UPLOAD_SIZE_BYTES: int = 104857600  # 100 MB Limit
+
+    ALLOWED_EXTENSIONS: List[str] = [
+        # Documents & Reports
+        "txt", "pdf", "doc", "docx", "md", "rtf", "html", "prompt", "log",
+        # Spreadsheets & Datasets
+        "csv", "xlsx", "xls", "ods", "json", "parquet", "arrow", "feather", "h5", "hdf5",
+        # Images
+        "jpg", "jpeg", "png", "gif", "webp", "svg",
+        # Audio & Video
+        "mp3", "wav", "ogg", "mp4", "webm", "avi",
+        # AI Models
+        "pt", "pth", "onnx", "safetensors", "bin", "tflite"
+    ]
+
+    ALLOWED_MIME_TYPES: List[str] = [
+        "text/plain", "text/csv", "text/markdown", "text/html", "application/pdf",
+        "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/json", "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/x-parquet", "application/octet-stream",
+        "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+        "audio/mpeg", "audio/wav", "audio/ogg",
+        "video/mp4", "video/webm", "video/x-msvideo"
+    ]
+    
     CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:3000",
         "http://localhost:5173",

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.routers import health, auth, users, workspace, ai_studio, project_generator, chat, workflow
+from app.routers import health, auth, users, assets, workspace, ai_studio, project_generator, chat, workflow
 
 api_v1_router = APIRouter()
 
@@ -7,6 +7,7 @@ api_v1_router = APIRouter()
 api_v1_router.include_router(health.router)
 api_v1_router.include_router(auth.router)
 api_v1_router.include_router(users.router)
+api_v1_router.include_router(assets.router)
 api_v1_router.include_router(workspace.router)
 api_v1_router.include_router(ai_studio.router)
 api_v1_router.include_router(project_generator.router)

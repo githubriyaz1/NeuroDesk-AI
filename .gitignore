@@ -45,6 +45,8 @@ venv.bak/
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+backend/storage/
+storage/
 
 # Databases & Local Logs
 *.sqlite

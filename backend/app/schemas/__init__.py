@@ -15,6 +15,14 @@ from app.schemas.ai_studio import AIModelCreate, AIModelUpdate, AIModelResponse
 from app.schemas.project_generator import ProjectGenerateRequest, ProjectBlueprintResponse
 from app.schemas.chat import ChatMessagePrompt, ChatSessionResponse
 from app.schemas.workflow import WorkflowCreate, WorkflowResponse
+from app.schemas.asset import (
+    AssetCreate,
+    AssetUpdate,
+    AssetFavoriteToggle,
+    AssetResponse,
+    AssetListResponse,
+    AssetStatisticsResponse,
+)
 
 __all__ = [
     "ResponseWrapper",
@@ -40,4 +48,10 @@ __all__ = [
     "ChatSessionResponse",
     "WorkflowCreate",
     "WorkflowResponse",
+    "AssetCreate",
+    "AssetUpdate",
+    "AssetFavoriteToggle",
+    "AssetResponse",
+    "AssetListResponse",
+    "AssetStatisticsResponse",
 ]

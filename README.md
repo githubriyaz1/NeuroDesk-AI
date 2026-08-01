@@ -1,6 +1,6 @@
 # NeuroDesk AI 🧠⚡
 
-> Enterprise AI-Powered Intelligent Workspace for Data Analysis, AI Studio Modeling, Automated Workflows, and AI-Assisted Project Architecture.
+> Enterprise AI-Powered Intelligent Workspace for Data Analysis, AI Studio Modeling, Automated Workflows, Digital Asset Management (DAMS), and AI-Assisted Project Architecture.
 
 [![CI/CD Pipeline](https://github.com/your-org/NeuroDesk-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/NeuroDesk-AI/actions/workflows/ci.yml)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
@@ -8,39 +8,53 @@
 [![Tailwind CSS](https://img.shields.io/badge/Styling-Tailwind%20CSS-38B2AC.svg?style=flat&logo=tailwind-css)](https://tailwindcss.com)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791.svg?style=flat&logo=postgresql)](https://www.postgresql.org)
 [![JWT Auth](https://img.shields.io/badge/Auth-JWT%20%2B%20Rotation-indigo.svg?style=flat&logo=json-web-tokens)](https://jwt.io)
+[![DAMS Core](https://img.shields.io/badge/Storage-DAMS%20Core-emerald.svg?style=flat&logo=files)](https://jwt.io)
 [![Docker](https://img.shields.io/badge/Container-Docker-2496ED.svg?style=flat&logo=docker)](https://www.docker.com)
 
 ---
 
 ## 📌 Executive Overview
 
-**NeuroDesk AI** is an enterprise-grade intelligent workspace designed to unify data engineering, machine learning lifecycle management, conversational AI analytics, automated pipeline orchestration, and AI-driven software project blueprinting into a single sleek interface.
+**NeuroDesk AI** is an enterprise-grade intelligent workspace designed to unify digital asset management, machine learning lifecycle management, conversational AI analytics, automated pipeline orchestration, and AI-driven software project blueprinting into a single sleek interface.
 
-NeuroDesk AI incorporates a production-ready **JWT Authentication & Token Rotation Module** with secure bcrypt password hashing, persistent session tracking, automatic token refreshing, and fine-grained access control.
+NeuroDesk AI incorporates a production-ready **Digital Asset Management System (DAMS Core)** serving as the centralized repository for all datasets, model weights, prompts, documents, images, and reports across the ecosystem.
+
+---
+
+## 📁 Digital Asset Management System (DAMS Core Architecture)
+
+The DAMS Core provides a pluggable storage provider abstraction (`StorageService` $\rightarrow$ `LocalStorageProvider` / S3 / GCS) ensuring business logic remains independent of physical storage mechanics.
+
+```
++------------------+                    +------------------+                    +---------------------+
+|   React Client   |                    | FastAPI DAMS API |                    | Pluggable Storage   |
++--------+---------+                    +--------+---------+                    +----------+----------+
+         |                                       |                                         |
+         | --- POST /api/v1/assets/upload ------>| -- Stream & Compute SHA256 ------------>|
+         |                                       | -- Write to storage/uploads/{u}/{y}/{m}/->|
+         |                                       | -- Save metadata to PostgreSQL -------->|
+         |<-- Return Asset DTO (No internal path)|                                         |
+         |                                       |                                         |
+         | --- GET /api/v1/assets/{id}/download->| -- Validate Owner Permission ----------->|
+         |<-- Stream Physical File --------------|<-- Read File Stream --------------------|
+```
+
+### DAMS Core APIs (`/api/v1/assets`)
+- `POST   /api/v1/assets/upload` - Multipart upload with SHA256 checksum & MIME classification.
+- `GET    /api/v1/assets/{id}/download` - Secure file stream download for authorized owner.
+- `GET    /api/v1/assets` - Paginated asset listing with type/status/favorite filters.
+- `GET    /api/v1/assets/statistics` - Storage consumption and asset aggregations.
+- `GET    /api/v1/assets/{id}` - Fetch single asset metadata.
+- `PATCH  /api/v1/assets/{id}` - Rename asset or update description.
+- `POST   /api/v1/assets/{id}/favorite` - Toggle asset favorite status.
+- `DELETE /api/v1/assets/{id}` - Soft delete asset (move to trash).
+- `POST   /api/v1/assets/{id}/restore` - Restore soft-deleted asset.
 
 ---
 
 ## 🔐 Authentication & Session Security Architecture
 
 NeuroDesk AI uses a dual-token architecture (Access Token + Refresh Token with Token Rotation):
-
-```
-+------------------+                    +------------------+                    +------------------+
-|   React Client   |                    | FastAPI Auth Gateway               | PostgreSQL Engine|
-+--------+---------+                    +--------+---------+                    +--------+---------+
-         |                                       |                                       |
-         | --- POST /api/v1/auth/login --------->| -- Query User & verify bcrypt password ->|
-         |                                       | <-- Return User Record ---------------|
-         |<-- Return { access_token, refresh_tok}| -- Save Refresh Token SHA-256 Hash -->|
-         |                                       |                                       |
-         | --- HTTP Request (Bearer Access) ---->| -- Validate JWT Signature & Expire --->|
-         |<-- HTTP 200 OK Response --------------|                                       |
-         |                                       |                                       |
-         | (Access Token Expired: HTTP 401)      |                                       |
-         | --- POST /api/v1/auth/refresh ------->| -- Lookup Hash & verify not revoked ->|
-         |                                       | -- Revoke Old Token & Issue New Token ->|
-         |<-- Return New Token Pair -------------|                                       |
-```
 
 ### Authentication Endpoints
 - `POST /api/v1/auth/register` - Create new user account with bcrypt password hashing.
@@ -58,46 +72,44 @@ NeuroDesk AI uses a dual-token architecture (Access Token + Refresh Token with T
 
 ### Frontend Architecture
 - **Core Framework**: React 18+ powered by Vite
-- **Routing**: React Router DOM v6 with `ProtectedRoute` guards
-- **Authentication Context**: Global `AuthContext` with session hydration and automatic token refresh interceptor
-- **HTTP Client**: Axios with centralized request/response token rotation interceptors
-- **Styling**: Tailwind CSS v3 with modern dark design tokens & glassmorphism
-- **Icons**: Lucide React
-- **Unit Testing**: Vitest + React Testing Library
+- **Styling & Icons**: Vanilla CSS & Tailwind CSS with dark theme aesthetics, Lucide React icons
+- **State Management**: React Context (`AuthContext`, `AssetContext`, `ThemeContext`)
+- **HTTP Client**: Axios with automatic Bearer token injection and 401 token-refresh interceptors
 
 ### Backend Architecture
-- **Core API Engine**: Python 3.11+ & FastAPI
-- **Security & Cryptography**: Passlib (bcrypt), PyJWT, Python `secrets` & `hashlib`
-- **Data Validation & DTOs**: Pydantic v2 & Pydantic-Settings
-- **ORM & Database Connection**: SQLAlchemy 2.0 Async ORM (`asyncpg`)
-- **Logging & Monitoring**: Structured JSON/Console logging middleware with request timing
-- **Unit Testing**: Pytest + HTTPX test suite
+- **API Framework**: FastAPI 0.111+ with async endpoints
+- **Database ORM**: SQLAlchemy 2.0 with generic dialect-agnostic types
+- **Storage Layer**: Pluggable `StorageService` with `LocalStorageProvider`
+- **Validation**: Pydantic v2 schemas (`ConfigDict`)
+- **Security**: Native `bcrypt` password hashing, PyJWT, SHA-256 token hashing
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Start Guide
 
-### Option A: Running with Docker (Recommended)
-```bash
-docker-compose up --build -d
-```
-Access points:
-- **Frontend UI**: [http://localhost:3000](http://localhost:3000)
-- **FastAPI Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
+### Local Development Setup
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/githubriyaz1/NeuroDesk-AI.git
+   cd NeuroDesk-AI
+   ```
 
-### Option B: Running Local Tests
-```bash
-# Run backend pytest suite (Authentication & API tests)
-cd backend
-pytest -v
+2. Run local setup script or launch dev environment:
+   ```bash
+   # Powershell script launches backend & frontend
+   .\scripts\start-dev.ps1
+   ```
 
-# Run frontend Vitest suite
-cd frontend
-npm run test:run
-```
+3. Backend Pytest Execution:
+   ```bash
+   cd backend
+   .\venv\Scripts\activate
+   pytest -v
+   ```
 
----
-
-## 📄 License & Attribution
-
-NeuroDesk AI is engineered following Enterprise Clean Architecture principles. Distributed under the MIT License.
+4. Frontend Build & Vitest Execution:
+   ```bash
+   cd frontend
+   npm run build
+   npm run test:run
+   ```
