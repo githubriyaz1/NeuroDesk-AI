@@ -1,8 +1,12 @@
 import uuid
-from datetime import datetime
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UUID
+from datetime import datetime, timezone
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class RefreshToken(Base):
@@ -18,7 +22,11 @@ class RefreshToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
+        DateTime(timezone=True), default=utc_now
     )
 
     user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")
+
+    __table_args__ = (
+        Index("idx_refresh_tokens_user_revoked", "user_id", "revoked"),
+    )

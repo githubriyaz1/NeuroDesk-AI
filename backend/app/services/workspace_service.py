@@ -1,6 +1,6 @@
 from typing import List
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from app.schemas.workspace import WorkspaceCreate, WorkspaceResponse, WorkspaceUpdate
 
 
@@ -9,7 +9,7 @@ class WorkspaceService:
 
     async def list_workspaces(self, user_id: UUID) -> List[WorkspaceResponse]:
         """Return sample workspace datasets and documents for initial workspace setup."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return [
             WorkspaceResponse(
                 id=UUID("11111111-1111-1111-1111-111111111111"),
@@ -41,7 +41,7 @@ class WorkspaceService:
 
     async def create_workspace(self, user_id: UUID, item: WorkspaceCreate) -> WorkspaceResponse:
         """Create new workspace entry placeholder."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return WorkspaceResponse(
             id=uuid4(),
             name=item.name,

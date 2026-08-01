@@ -57,3 +57,20 @@ async def async_client() -> AsyncGenerator[AsyncClient, None]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield client
+
+
+@pytest.fixture
+async def auth_headers(async_client: AsyncClient) -> dict:
+    """Shared fixture for obtaining authenticated Bearer headers."""
+    email = "test_user@neurodesk.ai"
+    password = "TestPassword2026!"
+    await async_client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "full_name": "Test User", "password": password},
+    )
+    login_res = await async_client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": password},
+    )
+    token = login_res.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}

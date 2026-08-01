@@ -1,7 +1,7 @@
 from uuid import UUID
 from datetime import datetime
 from typing import Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class AIModelCreate(BaseModel):
@@ -11,12 +11,16 @@ class AIModelCreate(BaseModel):
     workspace_id: Optional[UUID] = None
     hyperparameters: Optional[Dict[str, Any]] = {}
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 class AIModelUpdate(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
     accuracy_score: Optional[float] = None
     hyperparameters: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class AIModelResponse(BaseModel):
@@ -32,5 +36,4 @@ class AIModelResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())

@@ -1,6 +1,6 @@
 from typing import List
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from app.schemas.chat import ChatMessagePrompt, ChatSessionResponse
 
 
@@ -9,7 +9,7 @@ class AIChatService:
 
     async def get_or_create_session(self, user_id: UUID, session_id: UUID | None = None) -> ChatSessionResponse:
         """Returns existing or creates new chat session."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return ChatSessionResponse(
             id=session_id or uuid4(),
             title="Data Intelligence Workspace Chat",
@@ -27,7 +27,7 @@ class AIChatService:
 
     async def send_prompt(self, user_id: UUID, prompt_in: ChatMessagePrompt) -> ChatSessionResponse:
         """Process user message and return assistant reply."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         session = await self.get_or_create_session(user_id, prompt_in.session_id)
         
         user_msg = {"role": "user", "content": prompt_in.prompt, "timestamp": now.isoformat()}

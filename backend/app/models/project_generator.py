@@ -1,9 +1,13 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List
 from sqlalchemy import DateTime, ForeignKey, String, Text, UUID, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database.base import Base
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class ProjectBlueprint(Base):
@@ -23,8 +27,8 @@ class ProjectBlueprint(Base):
     feature_breakdown: Mapped[List[Any]] = mapped_column(JSON, default=list)
     roadmap: Mapped[List[Any]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
+        DateTime(timezone=True), default=utc_now
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )

@@ -1,6 +1,6 @@
 from typing import List
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from app.schemas.workflow import WorkflowCreate, WorkflowResponse
 
 
@@ -9,7 +9,7 @@ class WorkflowService:
 
     async def list_workflows(self, user_id: UUID) -> List[WorkflowResponse]:
         """Return sample registered workflows."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return [
             WorkflowResponse(
                 id=UUID("55555555-5555-5555-5555-555555555555"),
@@ -32,7 +32,7 @@ class WorkflowService:
 
     async def create_workflow(self, user_id: UUID, item: WorkflowCreate) -> WorkflowResponse:
         """Create new automation workflow."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return WorkflowResponse(
             id=uuid4(),
             name=item.name,

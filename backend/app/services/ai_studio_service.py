@@ -1,6 +1,6 @@
 from typing import List
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from app.schemas.ai_studio import AIModelCreate, AIModelResponse
 
 
@@ -9,7 +9,7 @@ class AIStudioService:
 
     async def list_models(self, user_id: UUID) -> List[AIModelResponse]:
         """Return registered AI models in AI Studio."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return [
             AIModelResponse(
                 id=UUID("33333333-3333-3333-3333-333333333333"),
@@ -41,7 +41,7 @@ class AIStudioService:
 
     async def create_model(self, user_id: UUID, model_in: AIModelCreate) -> AIModelResponse:
         """Register a new AI Model in AI Studio."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return AIModelResponse(
             id=uuid4(),
             name=model_in.name,

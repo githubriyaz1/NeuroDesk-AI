@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS workflows (
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_revoked ON refresh_tokens(user_id, revoked);
 CREATE INDEX IF NOT EXISTS idx_workspaces_owner ON workspaces(owner_id);
 CREATE INDEX IF NOT EXISTS idx_ai_models_owner ON ai_models(owner_id);
 CREATE INDEX IF NOT EXISTS idx_project_blueprints_owner ON project_blueprints(owner_id);

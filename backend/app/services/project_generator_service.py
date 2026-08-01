@@ -1,6 +1,6 @@
 from typing import List
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from app.schemas.project_generator import ProjectGenerateRequest, ProjectBlueprintResponse
 
 
@@ -9,7 +9,7 @@ class ProjectGeneratorService:
 
     async def generate_blueprint(self, user_id: UUID, req: ProjectGenerateRequest) -> ProjectBlueprintResponse:
         """Generates a structured architectural blueprint based on the user's idea description."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # High-level architecture overview text
         arch_overview = (

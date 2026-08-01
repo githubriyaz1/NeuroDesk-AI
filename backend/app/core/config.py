@@ -1,6 +1,6 @@
 import json
 from typing import List, Union
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +40,23 @@ class Settings(BaseSettings):
         elif isinstance(v, list):
             return v
         return []
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        """Enforces mandatory secure configuration in production environment."""
+        if self.ENVIRONMENT.lower() in ("production", "prod"):
+            if (
+                self.SECRET_KEY == "super_secret_jwt_key_neurodesk_2026_enterprise"
+                or len(self.SECRET_KEY) < 32
+            ):
+                raise ValueError(
+                    "CRITICAL SECURITY ERROR: In production mode, SECRET_KEY must be explicitly defined and at least 32 characters long."
+                )
+            if "localhost" in self.DATABASE_URL or "neurodesk_secret_password" in self.DATABASE_URL:
+                raise ValueError(
+                    "CRITICAL SECURITY ERROR: In production mode, DATABASE_URL must be configured with secure production database credentials."
+                )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",
