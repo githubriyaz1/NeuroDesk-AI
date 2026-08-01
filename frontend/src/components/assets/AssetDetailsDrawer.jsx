@@ -3,6 +3,7 @@ import { X, Download, Star, Trash2, RotateCcw, Edit2, Check, ShieldCheck, FileTe
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { formatBytes, formatDate } from '../../utils/formatters';
+import { MetadataSection } from './MetadataSection';
 
 const getAssetIcon = (type) => {
   switch (type) {
@@ -156,9 +157,12 @@ export const AssetDetailsDrawer = ({
               )}
             </div>
 
+            {/* Metadata Indexing Section */}
+            <MetadataSection assetId={asset.id} />
+
             {/* Detailed File Specs */}
             <div className="space-y-2.5 pt-4 border-t border-zinc-800/80 text-xs">
-              <h4 className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider mb-2">Technical Metadata</h4>
+              <h4 className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider mb-2">Technical System Specs</h4>
               
               <div className="flex justify-between py-1 border-b border-zinc-900 text-zinc-300">
                 <span className="text-zinc-500 font-mono">Original File:</span>

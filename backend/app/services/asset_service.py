@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import BinaryIO, Optional, Tuple
+from typing import BinaryIO, List, Optional, Tuple
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,7 @@ from app.core.logging import logger
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.repositories.asset_repository import asset_repository
 from app.schemas.asset import (
+    AssetBulkActionResponse,
     AssetDetailResponse,
     AssetStatisticsResponse,
     AssetUploadResponse,
@@ -94,7 +95,6 @@ class AssetService:
             db, user_id, checksum_hex, file_size
         )
         if existing:
-            # If duplicate exists in storage, clean up newly written file and return existing or create version
             await storage_service.delete_file(rel_storage_path)
             return AssetUploadResponse.model_validate(existing)
 
@@ -120,6 +120,14 @@ class AssetService:
 
         created_asset = await asset_repository.create(db, new_asset)
         logger.info(f"Asset uploaded successfully: {created_asset.id} [{created_asset.original_filename}]")
+
+        # Automatically extract and index asset metadata
+        try:
+            from app.services.metadata_service import metadata_service
+            await metadata_service.index_and_persist(db, created_asset)
+        except Exception as e:
+            logger.error(f"Failed to auto-extract metadata for asset {created_asset.id}: {e}")
+
         return AssetUploadResponse.model_validate(created_asset)
 
     async def get_asset_model(
@@ -190,6 +198,40 @@ class AssetService:
         updated = await asset_repository.save(db, asset)
         logger.info(f"Restored asset: {updated.id}")
         return AssetDetailResponse.model_validate(updated)
+
+    async def toggle_archive(
+        self, db: AsyncSession, user_id: UUID, asset_id: UUID, is_archived: bool = True
+    ) -> AssetDetailResponse:
+        """Toggles asset archive status."""
+        asset = await self.get_asset_model(db, user_id, asset_id, include_deleted=False)
+
+        now = datetime.now(timezone.utc)
+        asset.status = AssetStatus.ARCHIVED.value if is_archived else AssetStatus.READY.value
+        asset.updated_at = now
+
+        updated = await asset_repository.save(db, asset)
+        logger.info(f"Updated asset archive state: {updated.id} -> {updated.status}")
+        return AssetDetailResponse.model_validate(updated)
+
+    async def bulk_action(
+        self, db: AsyncSession, user_id: UUID, asset_ids: List[UUID], action: str
+    ) -> AssetBulkActionResponse:
+        """Performs bulk action (delete, restore, favorite, unfavorite, archive, unarchive) across assets."""
+        action = action.lower()
+        if action not in ["delete", "restore", "favorite", "unfavorite", "archive", "unarchive"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported bulk action '{action}'.",
+            )
+
+        processed_count = await asset_repository.execute_bulk_action(db, user_id, asset_ids, action)
+
+        return AssetBulkActionResponse(
+            success=True,
+            processed_count=processed_count,
+            action=action,
+            message=f"Successfully executed bulk action '{action}' on {processed_count} assets.",
+        )
 
     async def rename_asset(
         self,

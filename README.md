@@ -1,6 +1,6 @@
 # NeuroDesk AI 🧠⚡
 
-> Enterprise AI-Powered Intelligent Workspace for Data Analysis, AI Studio Modeling, Automated Workflows, Digital Asset Management (DAMS), and AI-Assisted Project Architecture.
+> Enterprise AI-Powered Intelligent Workspace for Data Analysis, AI Studio Modeling, Automated Workflows, Digital Asset Management (DAMS), Enterprise Asset Explorer, Universal Preview Engine (UPE), Metadata & Indexing Engine, and AI-Assisted Project Architecture.
 
 [![CI/CD Pipeline](https://github.com/your-org/NeuroDesk-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/NeuroDesk-AI/actions/workflows/ci.yml)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
@@ -8,108 +8,91 @@
 [![Tailwind CSS](https://img.shields.io/badge/Styling-Tailwind%20CSS-38B2AC.svg?style=flat&logo=tailwind-css)](https://tailwindcss.com)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791.svg?style=flat&logo=postgresql)](https://www.postgresql.org)
 [![JWT Auth](https://img.shields.io/badge/Auth-JWT%20%2B%20Rotation-indigo.svg?style=flat&logo=json-web-tokens)](https://jwt.io)
+[![Metadata Engine](https://img.shields.io/badge/Metadata-Indexing%20Engine-orange.svg?style=flat&logo=database)](https://jwt.io)
 [![DAMS Core](https://img.shields.io/badge/Storage-DAMS%20Core-emerald.svg?style=flat&logo=files)](https://jwt.io)
+[![UPE Engine](https://img.shields.io/badge/Preview-UPE%20Engine-purple.svg?style=flat&logo=eye)](https://jwt.io)
 [![Docker](https://img.shields.io/badge/Container-Docker-2496ED.svg?style=flat&logo=docker)](https://www.docker.com)
 
 ---
 
 ## 📌 Executive Overview
 
-**NeuroDesk AI** is an enterprise-grade intelligent workspace designed to unify digital asset management, machine learning lifecycle management, conversational AI analytics, automated pipeline orchestration, and AI-driven software project blueprinting into a single sleek interface.
-
-NeuroDesk AI incorporates a production-ready **Digital Asset Management System (DAMS Core)** serving as the centralized repository for all datasets, model weights, prompts, documents, images, and reports across the ecosystem.
+**NeuroDesk AI** is an enterprise-grade intelligent workspace designed to unify digital asset management, machine learning lifecycle management, metadata extraction & indexing, conversational AI analytics, automated pipeline orchestration, universal file previews, enterprise asset exploration, and AI-driven software project blueprinting into a single sleek interface.
 
 ---
 
-## 📁 Digital Asset Management System (DAMS Core Architecture)
+## 🔍 Metadata & Indexing Engine (Sprint 3.4 Architecture)
 
-The DAMS Core provides a pluggable storage provider abstraction (`StorageService` $\rightarrow$ `LocalStorageProvider` / S3 / GCS) ensuring business logic remains independent of physical storage mechanics.
+The **Metadata & Indexing Engine** automatically extracts, indexes, stores, and refreshes format-specific metadata for digital assets upon upload or on-demand refresh.
 
 ```
-+------------------+                    +------------------+                    +---------------------+
-|   React Client   |                    | FastAPI DAMS API |                    | Pluggable Storage   |
-+--------+---------+                    +--------+---------+                    +----------+----------+
-         |                                       |                                         |
-         | --- POST /api/v1/assets/upload ------>| -- Stream & Compute SHA256 ------------>|
-         |                                       | -- Write to storage/uploads/{u}/{y}/{m}/->|
-         |                                       | -- Save metadata to PostgreSQL -------->|
-         |<-- Return Asset DTO (No internal path)|                                         |
-         |                                       |                                         |
-         | --- GET /api/v1/assets/{id}/download->| -- Validate Owner Permission ----------->|
-         |<-- Stream Physical File --------------|<-- Read File Stream --------------------|
++-------------------+                    +-----------------------+                    +---------------------------+
+|   React Client    |                    | FastAPI Router        |                    |  Metadata Engine Layers   |
++---------+---------+                    +-----------+-----------+                    +-------------+-------------+
+          |                                          |                                              |
+          | --- GET /assets/{id}/metadata ---------->| -- Validate Owner & Call MetadataService --->|
+          |                                          | -- MetadataIndexer selects Extractor ------->| (PDF/CSV/Excel/Image)
+          |                                          | -- Persists to AssetMetadata DB Model ------>|
+          |<-- Returns Categorized Metadata Groups --|                                              |
+          |                                          |                                              |
+          | --- POST /assets/{id}/metadata/refresh ->| -- Forces re-extraction & DB upsert -------->|
 ```
 
-### DAMS Core APIs (`/api/v1/assets`)
+### Format-Specific Metadata Support
+- **PDF**: Title, Author, Producer, Page Count, Encrypted flag, File Size.
+- **CSV**: Row Count, Column Count, Headers JSON, Delimiter, Encoding.
+- **Excel**: Sheet Count, Sheet Names JSON, Active Sheet Title.
+- **Image**: Width, Height, Aspect Ratio, DPI, Color Mode, Image Format.
+- **Fallback**: File Name, MIME Type, Extension, File Size.
+
+### Metadata Engine REST APIs (`/api/v1/assets`)
+- `GET  /api/v1/assets/{asset_id}/metadata` - Retrieves structured metadata grouped by logical categories.
+- `POST /api/v1/assets/{asset_id}/metadata/refresh` - Forces re-extraction and refresh of asset metadata.
+
+---
+
+## 📂 Enterprise Asset Explorer (Sprint 3.3 Architecture)
+
+The **Enterprise Asset Explorer** provides a Vercel/Linear-grade workspace experience for browsing, managing, and operating on digital assets.
+
+### Asset Explorer REST APIs (`/api/v1/assets`)
+- `POST   /api/v1/assets/bulk-action` - Execute bulk operations (delete, restore, favorite, unfavorite, archive, unarchive) across asset IDs.
+- `POST   /api/v1/assets/{id}/archive` - Toggle asset archive state (`status: ARCHIVED`).
 - `POST   /api/v1/assets/upload` - Multipart upload with SHA256 checksum & MIME classification.
 - `GET    /api/v1/assets/{id}/download` - Secure file stream download for authorized owner.
-- `GET    /api/v1/assets` - Paginated asset listing with type/status/favorite filters.
-- `GET    /api/v1/assets/statistics` - Storage consumption and asset aggregations.
-- `GET    /api/v1/assets/{id}` - Fetch single asset metadata.
-- `PATCH  /api/v1/assets/{id}` - Rename asset or update description.
-- `POST   /api/v1/assets/{id}/favorite` - Toggle asset favorite status.
-- `DELETE /api/v1/assets/{id}` - Soft delete asset (move to trash).
-- `POST   /api/v1/assets/{id}/restore` - Restore soft-deleted asset.
+- `GET    /api/v1/assets` - Paginated asset listing with flexible sorting & category filters.
 
 ---
 
-## 🔐 Authentication & Session Security Architecture
+## 👁️ Universal Preview Engine (UPE Architecture)
 
-NeuroDesk AI uses a dual-token architecture (Access Token + Refresh Token with Token Rotation):
-
-### Authentication Endpoints
-- `POST /api/v1/auth/register` - Create new user account with bcrypt password hashing.
-- `POST /api/v1/auth/login` - Authenticate credentials and issue Access & Refresh tokens.
-- `POST /api/v1/auth/refresh` - Rotate refresh token and issue new token pair.
-- `POST /api/v1/auth/logout` - Revoke refresh token session.
-- `GET  /api/v1/users/me` - Fetch authenticated user details.
-- `PUT  /api/v1/users/profile` - Update user display profile.
-- `POST /api/v1/users/change-password` - Change password and revoke active sessions.
-- `DELETE /api/v1/users/delete-account` - Soft delete account and revoke all sessions.
+The **Universal Preview Engine (UPE)** establishes a unified, provider-based preview layer (`PreviewService` $\rightarrow$ `PDFPreviewProvider`, `CSVPreviewProvider`, `ExcelPreviewProvider`, `ImagePreviewProvider`, `UnsupportedPreviewProvider`) consumed across all workspace features.
 
 ---
 
-## 🛠 Technology Stack
+## 🚀 Getting Started
 
-### Frontend Architecture
-- **Core Framework**: React 18+ powered by Vite
-- **Styling & Icons**: Vanilla CSS & Tailwind CSS with dark theme aesthetics, Lucide React icons
-- **State Management**: React Context (`AuthContext`, `AssetContext`, `ThemeContext`)
-- **HTTP Client**: Axios with automatic Bearer token injection and 401 token-refresh interceptors
+### Backend Setup
+```bash
+cd backend
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
 
-### Backend Architecture
-- **API Framework**: FastAPI 0.111+ with async endpoints
-- **Database ORM**: SQLAlchemy 2.0 with generic dialect-agnostic types
-- **Storage Layer**: Pluggable `StorageService` with `LocalStorageProvider`
-- **Validation**: Pydantic v2 schemas (`ConfigDict`)
-- **Security**: Native `bcrypt` password hashing, PyJWT, SHA-256 token hashing
+### Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
----
+### Running Test Suites
+```bash
+# Backend pytest suite (27 tests)
+cd backend && pytest -v
 
-## 🚀 Quick Start Guide
-
-### Local Development Setup
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/githubriyaz1/NeuroDesk-AI.git
-   cd NeuroDesk-AI
-   ```
-
-2. Run local setup script or launch dev environment:
-   ```bash
-   # Powershell script launches backend & frontend
-   .\scripts\start-dev.ps1
-   ```
-
-3. Backend Pytest Execution:
-   ```bash
-   cd backend
-   .\venv\Scripts\activate
-   pytest -v
-   ```
-
-4. Frontend Build & Vitest Execution:
-   ```bash
-   cd frontend
-   npm run build
-   npm run test:run
-   ```
+# Frontend Vitest runner (10 tests)
+cd frontend && npm run test:run
+```

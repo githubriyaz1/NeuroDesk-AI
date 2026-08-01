@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 from uuid import UUID
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import Asset, AssetStatus
@@ -27,6 +27,19 @@ class AssetRepository:
 
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_by_ids(
+        self, db: AsyncSession, user_id: UUID, asset_ids: List[UUID], include_deleted: bool = True
+    ) -> List[Asset]:
+        """Queries list of assets matching asset_ids for the specified user."""
+        if not asset_ids:
+            return []
+        stmt = select(Asset).where(Asset.id.in_(asset_ids), Asset.owner_id == user_id)
+        if not include_deleted:
+            stmt = stmt.where(Asset.is_deleted == False)
+
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
     async def get_by_checksum_and_size(
         self, db: AsyncSession, user_id: UUID, checksum: str, file_size: int
@@ -64,33 +77,96 @@ class AssetRepository:
         """Returns paginated assets list and total item count for the specified user."""
         stmt = select(Asset).where(Asset.owner_id == user_id)
 
-        if not include_deleted:
+        if not include_deleted and status_filter != "DELETED":
             stmt = stmt.where(Asset.is_deleted == False)
+
         if is_favorite is not None:
             stmt = stmt.where(Asset.is_favorite == is_favorite)
+
         if asset_type:
             stmt = stmt.where(Asset.asset_type == asset_type.upper())
+
         if status_filter:
-            stmt = stmt.where(Asset.status == status_filter.upper())
+            if status_filter.upper() == "DELETED":
+                stmt = select(Asset).where(Asset.owner_id == user_id, Asset.is_deleted == True)
+            else:
+                stmt = stmt.where(Asset.status == status_filter.upper())
 
         # Count total records matching criteria
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total_result = await db.execute(count_stmt)
         total = total_result.scalar_one()
 
-        # Apply sorting
-        sort_col = getattr(Asset, sort_by, Asset.created_at)
-        if sort_dir.lower() == "asc":
-            stmt = stmt.order_by(sort_col.asc())
+        # Flexible sorting mapping
+        if sort_by in ["name_asc", "name"]:
+            sort_expr = Asset.name.asc() if (sort_dir.lower() == "asc" or sort_by == "name_asc") else Asset.name.desc()
+        elif sort_by in ["name_desc"]:
+            sort_expr = Asset.name.desc()
+        elif sort_by in ["size_largest", "size_desc"]:
+            sort_expr = Asset.file_size.desc()
+        elif sort_by in ["size_smallest", "size_asc"]:
+            sort_expr = Asset.file_size.asc()
+        elif sort_by in ["type"]:
+            sort_expr = Asset.asset_type.asc()
+        elif sort_by in ["oldest"]:
+            sort_expr = Asset.created_at.asc()
         else:
-            stmt = stmt.order_by(sort_col.desc())
+            sort_expr = Asset.created_at.asc() if sort_dir.lower() == "asc" else Asset.created_at.desc()
+
+        stmt = stmt.order_by(sort_expr)
 
         # Apply pagination limit & offset
         stmt = stmt.offset((page - 1) * page_size).limit(page_size)
         result = await db.execute(stmt)
         assets = result.scalars().all()
 
-        return assets, total
+        return list(assets), total
+
+    async def execute_bulk_action(
+        self, db: AsyncSession, user_id: UUID, asset_ids: List[UUID], action: str
+    ) -> int:
+        """Executes bulk operation across specified assets."""
+        assets = await self.get_by_ids(db, user_id, asset_ids, include_deleted=True)
+        if not assets:
+            return 0
+
+        now = datetime.now(timezone.utc)
+        count = 0
+
+        for asset in assets:
+            if action == "delete":
+                asset.is_deleted = True
+                asset.status = AssetStatus.DELETED.value
+                asset.deleted_at = now
+                asset.updated_at = now
+                count += 1
+            elif action == "restore":
+                asset.is_deleted = False
+                asset.status = AssetStatus.READY.value
+                asset.deleted_at = None
+                asset.updated_at = now
+                count += 1
+            elif action == "favorite":
+                asset.is_favorite = True
+                asset.updated_at = now
+                count += 1
+            elif action == "unfavorite":
+                asset.is_favorite = False
+                asset.updated_at = now
+                count += 1
+            elif action == "archive":
+                asset.status = AssetStatus.ARCHIVED.value
+                asset.updated_at = now
+                count += 1
+            elif action == "unarchive":
+                asset.status = AssetStatus.READY.value
+                asset.updated_at = now
+                count += 1
+
+            db.add(asset)
+
+        await db.flush()
+        return count
 
     async def get_user_statistics_aggregates(
         self, db: AsyncSession, user_id: UUID

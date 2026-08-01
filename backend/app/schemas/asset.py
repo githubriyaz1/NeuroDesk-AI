@@ -19,6 +19,22 @@ class AssetFavoriteToggle(BaseModel):
     is_favorite: bool
 
 
+class AssetArchiveToggle(BaseModel):
+    is_archived: bool = True
+
+
+class AssetBulkActionRequest(BaseModel):
+    asset_ids: List[UUID]
+    action: str = Field(..., description="Action: delete, restore, favorite, unfavorite, archive, unarchive")
+
+
+class AssetBulkActionResponse(BaseModel):
+    success: bool
+    processed_count: int
+    action: str
+    message: str
+
+
 class AssetDetailResponse(BaseModel):
     id: UUID
     owner_id: UUID

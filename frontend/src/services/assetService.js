@@ -87,6 +87,27 @@ export const assetService = {
   },
 
   /**
+   * Toggle archive state
+   */
+  async toggleArchive(assetId, isArchived = true) {
+    const response = await api.post(`/assets/${assetId}/archive`, {
+      is_archived: isArchived,
+    });
+    return response.data;
+  },
+
+  /**
+   * Execute bulk action across asset IDs
+   */
+  async executeBulkAction(assetIds, action) {
+    const response = await api.post('/assets/bulk-action', {
+      asset_ids: assetIds,
+      action,
+    });
+    return response.data;
+  },
+
+  /**
    * Soft delete asset
    */
   async deleteAsset(assetId) {

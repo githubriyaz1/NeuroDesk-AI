@@ -5,10 +5,25 @@
 NeuroDesk AI is built adhering to enterprise software engineering standards:
 
 1. **Separation of Concerns**: Clean isolation between UI components, API routes, business logic services, data access layers, and storage providers.
-2. **Domain Driven Design (DDD)**: Organization of code around domain models: Auth, Users, Digital Assets (DAMS), Workspace, AI Studio, Project Generator, AI Chat, and Workflows.
-3. **Pluggable Storage Layer**: DAMS Core utilizes `StorageService` wrapping abstract `StorageProvider` (defaulting to `LocalStorageProvider` under `storage/uploads/{user_id}/{year}/{month}/`), allowing future cloud providers (AWS S3, Azure Blob, GCS) to plug in with zero changes to business logic.
-4. **Stateless API Gateway**: FastAPI backend designed to scale horizontally across multiple container instances with stateless JWT sessions and database-backed refresh token rotation.
-5. **Modern Minimalist UI**: Sleek dark-theme design pattern adhering to Vercel/Linear UX guidelines.
+2. **Domain Driven Design (DDD)**: Organization of code around domain models: Auth, Users, Digital Assets (DAMS), Universal Preview Engine (UPE), Workspace, AI Studio, Project Generator, AI Chat, and Workflows.
+3. **Pluggable Preview Engine (UPE)**: `PreviewService` manages dynamic provider resolution (`PDFPreviewProvider`, `CSVPreviewProvider`, `ExcelPreviewProvider`, `ImagePreviewProvider`, `UnsupportedPreviewProvider`). New format providers (such as DOCX, PPTX, Audio, or Video) can be added cleanly without modifying `PreviewService`.
+4. **Pluggable Storage Layer**: DAMS Core utilizes `StorageService` wrapping abstract `StorageProvider` (defaulting to `LocalStorageProvider` under `storage/uploads/{user_id}/{year}/{month}/`), allowing future cloud providers (AWS S3, Azure Blob, GCS) to plug in with zero changes to business logic.
+5. **Stateless API Gateway**: FastAPI backend designed to scale horizontally across multiple container instances with stateless JWT sessions and database-backed refresh token rotation.
+6. **Modern Minimalist UI**: Sleek dark-theme design pattern adhering to Vercel/Linear UX guidelines.
+
+## Universal Preview Engine (UPE Subsystem)
+
+### UPE Lifecycle & Provider Resolution
+1. **Provider Resolution**:
+   - `PreviewService` maintains an ordered list of concrete providers (`PDFPreviewProvider`, `CSVPreviewProvider`, `ExcelPreviewProvider`, `ImagePreviewProvider`).
+   - For any target asset, `PreviewService.select_provider(asset)` evaluates `can_handle(asset_type, mime_type, extension)`.
+   - If no specialized provider matches, `UnsupportedPreviewProvider` handles the request gracefully.
+2. **Preview Payloads**:
+   - `PDF`: Extracts page count, document title, author, and page 1 text snippet.
+   - `CSV`: Extracts column headers, column count, row count, and first 50 sample data rows.
+   - `Excel`: Extracts sheet names, active sheet title, and 50 rows per sheet.
+   - `Image`: Extracts width, height, resolution, color mode, format, and aspect ratio.
+   - `Unsupported`: Returns `can_preview = False` and explanatory message.
 
 ## Digital Asset Management System (DAMS Core)
 
@@ -23,24 +38,6 @@ NeuroDesk AI is built adhering to enterprise software engineering standards:
    - File downloads are served via authorized, streaming API endpoints (`GET /api/v1/assets/{id}/download`).
    - Files stored on disk under `storage/uploads/{user_id}/{year}/{month}/{unique_filename}` to avoid directory bloat and filename collisions.
    - SHA-256 checksums computed during upload stream for integrity verification.
-3. **Soft Deletion & Recovery**:
-   - Deleting an asset sets `is_deleted = True` and `status = DELETED` with `deleted_at` timestamp.
-   - Soft-deleted assets can be restored via `POST /api/v1/assets/{id}/restore`.
-
-## Authentication & Security Subsystem
-
-### Dual Token Lifecycle & Token Rotation
-1. **Access Token**:
-   - Format: Signed JWT (HS256) containing `sub` (User UUID), `exp` (30 minutes), and `type: "access"`.
-   - Transport: Transmitted via HTTP Header (`Authorization: Bearer <access_token>`).
-   - Validation: Stateless verification via FastAPI dependency `get_current_user`.
-2. **Refresh Token**:
-   - Format: Cryptographic 64-character URL-safe string.
-   - Storage: SHA-256 hash stored in PostgreSQL `refresh_tokens` table.
-   - Lifetime: 7 days.
-   - Rotation Policy: Upon calling `/auth/refresh`, the old refresh token is marked `revoked = True` and a brand new refresh token is issued alongside a new access token.
-3. **Password Security**:
-   - Hashed using native `bcrypt`. No plaintext passwords stored.
 
 ## System Component Diagram
 
@@ -51,6 +48,8 @@ NeuroDesk AI is built adhering to enterprise software engineering standards:
 |   React 18 + Vite Single Page Application                             |
 |   ├── AuthContext (Global Session State & Token Manager)              |
 |   ├── AssetContext & useAssets (DAMS State & Upload Queue Manager)    |
+|   ├── PreviewDrawer (Universal Preview Engine Modal / Drawer)         |
+|   │   └── Renderers: PdfPreview, CsvPreview, ExcelPreview, Image...   |
 |   ├── ProtectedRoute Guard (Redirects unauthenticated to /login)      |
 |   ├── Pages: Login, Register, Profile, Workspace DAMS, AI Studio...   |
 |   └── Axios Interceptors (Auto Token Refresh on HTTP 401)             |
@@ -67,7 +66,8 @@ NeuroDesk AI is built adhering to enterprise software engineering standards:
 |   ├── Auth Router (/api/v1/auth/register, login, refresh, logout)     |
 |   ├── Users Router (/api/v1/users/me, profile, change-password)       |
 |   ├── Assets Router (/api/v1/assets/upload, download, list, stats...) |
-|   └── Service Layer (AuthService, AssetService, StorageService)       |
+|   ├── UPE Preview Endpoints (/api/v1/assets/{id}/preview, metadata)   |
+|   └── Service Layer (AuthService, AssetService, PreviewService)       |
 +-----------------------------------┬-----------------------------------+
                                     | Async DB & Storage Operations
                                     v

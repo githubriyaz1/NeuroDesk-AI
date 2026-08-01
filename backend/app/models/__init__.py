@@ -6,6 +6,7 @@ from app.models.project_generator import ProjectBlueprint
 from app.models.workflow import Workflow
 from app.models.chat import ChatSession
 from app.models.asset import Asset, AssetStatus, AssetType
+from app.models.asset_metadata import AssetMetadata
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "Asset",
     "AssetStatus",
     "AssetType",
+    "AssetMetadata",
 ]
