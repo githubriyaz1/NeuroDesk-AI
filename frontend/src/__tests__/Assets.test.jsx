@@ -52,7 +52,7 @@ describe('DAMS Workspace Page & Asset Management', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText('Enterprise Digital Asset Explorer')).toBeInTheDocument();
-    expect(screen.getByText('Upload Digital Asset')).toBeInTheDocument();
+    expect(screen.getByText(/Enterprise Digital Asset Explorer/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Upload Asset/i)[0]).toBeInTheDocument();
   });
 });

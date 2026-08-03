@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, Bell, Search, User } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useActivity } from '../../contexts/ActivityContext';
+import { NotificationDrawer } from '../common/NotificationDrawer';
 
 export const TopNav = ({ onMenuClick, currentTitle }) => {
   const { user } = useAuth();
+  const { setIsCommandPaletteOpen, unreadCount } = useActivity();
   const navigate = useNavigate();
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 bg-zinc-950/80 border-b border-zinc-800/80 backdrop-blur-md">
@@ -26,16 +30,26 @@ export const TopNav = ({ onMenuClick, currentTitle }) => {
 
       <div className="flex items-center gap-3">
         {/* Quick Search Trigger */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 w-64">
+        <button
+          onClick={() => setIsCommandPaletteOpen(true)}
+          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 w-64 hover:border-zinc-700 cursor-pointer transition-colors"
+        >
           <Search size={14} className="text-zinc-500" />
-          <span className="flex-1">Search workspace...</span>
-          <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-zinc-800 rounded border border-zinc-700 text-zinc-400">⌘K</kbd>
-        </div>
+          <span className="flex-1 text-left">Search workspace...</span>
+          <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-zinc-800 rounded border border-zinc-700 text-zinc-400">Ctrl+Shift+P</kbd>
+        </button>
 
-        {/* Notifications */}
-        <button className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 rounded-lg transition relative">
+        {/* Notifications Button */}
+        <button
+          onClick={() => setIsNotifOpen(true)}
+          className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 rounded-lg transition relative"
+        >
           <Bell size={18} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-indigo-500" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 rounded-full bg-cyan-500 text-[10px] font-bold text-slate-950 flex items-center justify-center">
+              {unreadCount}
+            </span>
+          )}
         </button>
 
         {/* User Profile Button */}
@@ -52,6 +66,8 @@ export const TopNav = ({ onMenuClick, currentTitle }) => {
           </div>
         </button>
       </div>
+
+      <NotificationDrawer isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />
     </header>
   );
 };

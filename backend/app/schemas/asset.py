@@ -131,3 +131,5 @@ AssetCreate = AssetCreateRequest
 AssetUpdate = AssetUpdateRequest
 AssetResponse = AssetDetailResponse
 AssetListResponse = PaginatedAssetResponse
+BulkActionRequest = AssetBulkActionRequest
+BulkActionResponse = AssetBulkActionResponse
