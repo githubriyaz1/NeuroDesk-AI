@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: List[str] = [
         # Documents & Reports
         "txt", "pdf", "doc", "docx", "md", "rtf", "html", "prompt", "log",
+        # Source Code & Scripts
+        "py", "js", "ts", "jsx", "tsx", "cpp", "c", "h", "java", "go", "rs", "sh", "yaml", "yml",
         # Spreadsheets & Datasets
         "csv", "xlsx", "xls", "ods", "json", "parquet", "arrow", "feather", "h5", "hdf5",
         # Images
