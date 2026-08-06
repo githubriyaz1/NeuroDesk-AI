@@ -1,6 +1,7 @@
 from typing import Dict, Type
 from app.core.llm.base import BaseLLMProvider
 from app.core.llm.mock_provider import MockProvider
+from app.core.llm.gemini_provider import GeminiProvider
 from app.core.logging import logger
 
 
@@ -28,8 +29,9 @@ class ProviderRegistry:
         return {name: p.__class__.__name__ for name, p in cls._providers.items()}
 
 
-# Initialize Factory with default MockProvider
+# Initialize Factory with default MockProvider and GeminiProvider
 ProviderRegistry.register(MockProvider())
+ProviderRegistry.register(GeminiProvider())
 
 
 class LLMProviderFactory:

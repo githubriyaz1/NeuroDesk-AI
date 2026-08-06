@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from app.core.knowledge.ranking import result_ranker
@@ -45,15 +45,16 @@ class KnowledgePipeline:
         clean = " ".join(clean.split())
         return clean
 
-    def select_retrievers(self, query: str, requested_types: Optional[List[str]] = None) -> List[BaseRetriever]:
-        """Selects target retrievers based on query intent or explicit requested list."""
-        if requested_types:
-            selected = [r for r_type, r in self._retrievers.items() if r_type in requested_types]
-            if selected:
-                return selected
-
-        # By default return all standard active retrievers
-        return list(self._retrievers.values())
+    def select_retrievers(self, query: str, requested_types: Optional[List[str]] = None) -> Tuple[List[BaseRetriever], Any]:
+        """Selects target retrievers based on IntentRouter confidence scoring and classification."""
+        from app.core.routing.intent_router import intent_router
+        decision = intent_router.route_query(query, requested_types)
+        
+        selected = [r for r_type, r in self._retrievers.items() if r_type in decision.target_retrievers]
+        if not selected:
+            selected = list(self._retrievers.values())
+            
+        return selected, decision
 
     async def execute_pipeline(
         self,
@@ -68,7 +69,7 @@ class KnowledgePipeline:
     ) -> KnowledgeQueryResult:
         start_time = time.time()
         clean_query = self.preprocess_query(query)
-        target_retrievers = self.select_retrievers(clean_query, retriever_types)
+        target_retrievers, decision = self.select_retrievers(clean_query, retriever_types)
 
         # 1. Parallel Retrieval via asyncio.gather
         tasks = [
@@ -90,6 +91,12 @@ class KnowledgePipeline:
             elif isinstance(res, Exception):
                 logger.warning(f"Retriever [{r_type}] failed during execution: {res}")
 
+        # If a specific page number was targeted in PDF_PAGE intent, prioritize page-matched documents
+        if decision.target_page is not None:
+            page_docs = [d for d in raw_documents if d.page_number == decision.target_page]
+            if page_docs:
+                raw_documents = page_docs + [d for d in raw_documents if d.page_number != decision.target_page]
+
         # 2. Result Ranking & Deduplication
         ranked_docs = self.ranker.rank_and_deduplicate(
             documents=raw_documents,
@@ -110,7 +117,7 @@ class KnowledgePipeline:
             documents=ranked_docs,
             citations=citations,
             packaged_context=packaged_context,
-            total_found=len(ranked_docs),
+            total_found=len(raw_documents),
             retrieval_latency_ms=latency_ms,
             retrievers_used=[r.retriever_type for r in target_retrievers],
         )

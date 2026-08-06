@@ -74,7 +74,7 @@ class WorkflowRunner:
                     db_session=db_session,
                 )
                 outputs = {
-                    "citations": [c.model_dump() for c in kq.citations],
+                    "citations": [c.model_dump(mode="json") for c in kq.citations],
                     "context_block": kq.packaged_context,
                     "retrieved_count": len(kq.citations),
                 }
@@ -89,7 +89,7 @@ class WorkflowRunner:
                 mime_type="text/plain",
                 text_content=text,
             )
-            outputs = doc_res.model_dump()
+            outputs = doc_res.model_dump(mode="json")
 
         elif node_type == "dataset_analysis":
             rows = data.get("rows") or [[1, "Product A", 100], [2, "Product B", 200]]
@@ -101,7 +101,7 @@ class WorkflowRunner:
                 columns=cols,
                 rows_data=rows,
             )
-            outputs = ds_res.model_dump()
+            outputs = ds_res.model_dump(mode="json")
 
         elif node_type == "conditional":
             expr = data.get("condition", "True")

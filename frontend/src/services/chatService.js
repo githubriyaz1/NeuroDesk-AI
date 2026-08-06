@@ -111,7 +111,7 @@ export const chatService = {
   },
 
   async streamResponse({ conversation_id, prompt, stream_id, onChunk, onError, onComplete }) {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('neurodesk_token') || localStorage.getItem('token');
     const response = await fetch(`/api/v1/chat/stream?stream_id=${stream_id || ''}`, {
       method: 'POST',
       headers: {
@@ -136,18 +136,30 @@ export const chatService = {
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n\n');
-      buffer = lines.pop(); // keep last incomplete line
+      buffer = lines.pop(); // keep last incomplete chunk
 
-      for (const line of lines) {
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
         if (line.startsWith('data: ')) {
           try {
-            const data = JSON.parse(line.replace('data: ', ''));
+            const data = JSON.parse(line.slice(6));
             if (onChunk) onChunk(data);
             if (data.is_final && onComplete) onComplete(data);
           } catch (err) {
             console.error('Failed to parse SSE chunk:', err);
           }
         }
+      }
+    }
+
+    // Process any remaining buffered chunk
+    if (buffer && buffer.trim().startsWith('data: ')) {
+      try {
+        const data = JSON.parse(buffer.trim().slice(6));
+        if (onChunk) onChunk(data);
+        if (data.is_final && onComplete) onComplete(data);
+      } catch (err) {
+        console.error('Failed to parse trailing SSE chunk:', err);
       }
     }
   },

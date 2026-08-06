@@ -19,6 +19,18 @@ class WorkflowService:
         nodes_dict = [n.model_dump() for n in payload.nodes]
         edges_dict = [e.model_dump() for e in payload.edges]
 
+        # Auto-populate default starter nodes if empty
+        if not nodes_dict:
+            nodes_dict = [
+                {"id": "start_1", "type": "start", "label": "Start Entry", "position": {"x": 100, "y": 150}, "data": {}},
+                {"id": "llm_1", "type": "llm_prompt", "label": "LLM Prompt", "position": {"x": 450, "y": 150}, "data": {"prompt": "Analyze input: {input}"}},
+                {"id": "end_1", "type": "end", "label": "End Output", "position": {"x": 800, "y": 150}, "data": {}},
+            ]
+            edges_dict = [
+                {"id": "e_1", "source": "start_1", "target": "llm_1"},
+                {"id": "e_2", "source": "llm_1", "target": "end_1"},
+            ]
+
         # Validate graph topology
         is_valid, errors = self.engine.validate_workflow(nodes_dict, edges_dict)
         if not is_valid:

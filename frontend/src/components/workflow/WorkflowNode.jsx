@@ -61,6 +61,7 @@ export const WorkflowNode = ({
   onConfigure,
   onStartConnect,
   onEndConnect,
+  onNodeMove,
 }) => {
   const IconComponent = NODE_ICONS[node.type] || Bot;
   const colorClass = NODE_COLORS[node.type] || 'from-slate-500/20 to-zinc-500/20 border-slate-500/50 text-slate-400';
@@ -69,18 +70,50 @@ export const WorkflowNode = ({
   const isSuccess = executionState?.status === 'SUCCESS';
   const isFailed = executionState?.status === 'FAILED';
 
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('button')) return;
+
+    onSelect(node);
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialPos = { x: node.position?.x || 0, y: node.position?.y || 0 };
+
+    const handleMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+      const newPos = {
+        x: Math.max(0, Math.round(initialPos.x + deltaX)),
+        y: Math.max(0, Math.round(initialPos.y + deltaY)),
+      };
+      if (onNodeMove) {
+        onNodeMove(node.id, newPos);
+      }
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   return (
     <div
+      onMouseDown={handleMouseDown}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(node);
       }}
       style={{
-        transform: `translate(${node.position.x}px, ${node.position.y}px)`,
+        transform: `translate(${node.position?.x || 0}px, ${node.position?.y || 0}px)`,
       }}
-      className={`absolute w-64 rounded-xl border backdrop-blur-md transition-all duration-200 cursor-move select-none shadow-xl bg-slate-900/90 ${
+      className={`absolute w-64 rounded-xl border backdrop-blur-md transition-all duration-75 cursor-move select-none shadow-xl bg-slate-900/90 ${
         isSelected
-          ? 'border-cyan-400 ring-2 ring-cyan-500/30 shadow-cyan-500/20'
+          ? 'border-cyan-400 ring-2 ring-cyan-500/30 shadow-cyan-500/20 z-10'
           : 'border-slate-800 hover:border-slate-700'
       }`}
     >

@@ -1,12 +1,11 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from uuid import UUID, uuid4
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, JSON
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from uuid import UUID as PyUUID, uuid4
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, JSON, UUID
 from sqlalchemy.orm import relationship
 
-from app.database.session import Base
+from app.database.base import Base
 
 
 class WorkflowStatus(str, Enum):
@@ -28,8 +27,8 @@ class Workflow(Base):
 
     __tablename__ = "workflows"
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(String(50), default=WorkflowStatus.DRAFT.value, nullable=False)
@@ -63,8 +62,8 @@ class WorkflowVersion(Base):
 
     __tablename__ = "workflow_versions"
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    workflow_id = Column(PG_UUID(as_uuid=True), ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    workflow_id = Column(UUID(as_uuid=True), ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False, index=True)
     version_number = Column(Integer, nullable=False)
     nodes_json = Column(JSON, default=list, nullable=False)
     edges_json = Column(JSON, default=list, nullable=False)
@@ -80,9 +79,9 @@ class WorkflowExecution(Base):
 
     __tablename__ = "workflow_executions"
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    workflow_id = Column(PG_UUID(as_uuid=True), ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False, index=True)
-    owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    workflow_id = Column(UUID(as_uuid=True), ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False, index=True)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     status = Column(String(50), default=ExecutionStatus.PENDING.value, nullable=False)
     trigger_source = Column(String(50), default="manual", nullable=False)  # manual, cron, api
     inputs_json = Column(JSON, default=dict, nullable=False)
@@ -111,8 +110,8 @@ class WorkflowExecutionNode(Base):
 
     __tablename__ = "workflow_execution_nodes"
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    execution_id = Column(PG_UUID(as_uuid=True), ForeignKey("workflow_executions.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    execution_id = Column(UUID(as_uuid=True), ForeignKey("workflow_executions.id", ondelete="CASCADE"), nullable=False, index=True)
     node_id = Column(String(100), nullable=False)
     node_type = Column(String(100), nullable=False)
     status = Column(String(50), default=ExecutionStatus.PENDING.value, nullable=False)
@@ -140,8 +139,8 @@ class ExecutionLog(Base):
 
     __tablename__ = "execution_logs"
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    execution_id = Column(PG_UUID(as_uuid=True), ForeignKey("workflow_executions.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    execution_id = Column(UUID(as_uuid=True), ForeignKey("workflow_executions.id", ondelete="CASCADE"), nullable=False, index=True)
     node_id = Column(String(100), nullable=True)
     log_level = Column(String(20), default="INFO", nullable=False)
     message = Column(Text, nullable=False)

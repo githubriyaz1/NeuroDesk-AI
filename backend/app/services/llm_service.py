@@ -44,7 +44,8 @@ class LLMService:
         max_retries: int = settings.MAX_RETRIES,
     ) -> ProviderResponse:
         """Executes LLM request with retry strategy and exponential backoff."""
-        provider = LLMProviderFactory.get_provider(provider_name)
+        active_provider_name = provider_name or getattr(settings, "LLM_PROVIDER", "mock")
+        provider = LLMProviderFactory.get_provider(active_provider_name)
         start_time = time.time()
 
         for attempt in range(1, max_retries + 1):
@@ -70,6 +71,27 @@ class LLMService:
                     )
                 await asyncio.sleep(2 ** (attempt - 1))
 
+    async def generate_non_streaming(
+        self,
+        provider_name: str = "mock",
+        model_name: str = settings.DEFAULT_MODEL,
+        prompt: str = "",
+        system_instruction: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Convenience method for non-streaming response generation used by WorkflowRunner."""
+        req = ProviderRequest(
+            prompt=prompt,
+            system_prompt=system_instruction,
+            model=model_name,
+        )
+        res = await self.execute_provider_request(provider_name, req)
+        return {
+            "text": res.content,
+            "markdown_content": res.markdown_content,
+            "token_usage": res.token_usage.model_dump(),
+            "latency_ms": res.latency_ms,
+        }
+
     async def stream_provider_response(
         self,
         conversation: Conversation,
@@ -90,10 +112,25 @@ class LLMService:
             citations=citations,
         )
 
-        provider = LLMProviderFactory.get_provider(provider_name)
+        formatted_msgs = mem_context.get("formatted_messages", [])
+        system_prompts = [m["content"] for m in formatted_msgs if m.get("role") == "system"]
+        sys_prompt_text = "\n\n".join(system_prompts) if system_prompts else conversation.settings_json.get("system_prompt")
+
+        history_msgs = [m for m in formatted_msgs if m.get("role") in ["user", "assistant"]]
+        if len(history_msgs) > 1:
+            history_lines = []
+            for h in history_msgs[:-1]:
+                role_label = "User" if h.get("role") == "user" else "Assistant"
+                history_lines.append(f"{role_label}: {h.get('content')}")
+            full_prompt = "Conversation History:\n" + "\n".join(history_lines) + f"\n\nUser Question: {current_prompt}"
+        else:
+            full_prompt = current_prompt
+
+        active_provider_name = provider_name or getattr(settings, "LLM_PROVIDER", "mock")
+        provider = LLMProviderFactory.get_provider(active_provider_name)
         req = ProviderRequest(
-            prompt=current_prompt,
-            system_prompt=conversation.settings_json.get("system_prompt"),
+            prompt=full_prompt,
+            system_prompt=sys_prompt_text,
             model=conversation.settings_json.get("model", settings.DEFAULT_MODEL),
             temperature=conversation.settings_json.get("temperature", 0.7),
             max_tokens=conversation.settings_json.get("max_tokens", 4096),

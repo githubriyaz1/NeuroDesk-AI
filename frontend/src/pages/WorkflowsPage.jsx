@@ -5,12 +5,15 @@ import { Badge } from '../components/common/Badge';
 import { Modal } from '../components/common/Modal';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { EmptyState } from '../components/common/EmptyState';
-import { GitFork, Plus, Play, CheckCircle2, Clock } from 'lucide-react';
+import { GitFork, Plus, Play, Clock, Edit3 } from 'lucide-react';
 import { workflowService } from '../services/workflowService';
+import { WorkflowCanvas } from '../components/workflow/WorkflowCanvas';
 
 export const WorkflowsPage = () => {
   const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'canvas'
+  const [activeWorkflowId, setActiveWorkflowId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', description: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -18,7 +21,7 @@ export const WorkflowsPage = () => {
   const fetchWorkflows = async () => {
     try {
       setLoading(true);
-      const data = await workflowService.getWorkflows();
+      const data = await workflowService.listWorkflows();
       setWorkflows(data || []);
     } catch (err) {
       console.error('Failed to fetch workflows:', err);
@@ -35,14 +38,17 @@ export const WorkflowsPage = () => {
     e.preventDefault();
     try {
       setSubmitting(true);
-      await workflowService.createWorkflow({
+      const created = await workflowService.createWorkflow({
         name: formData.name,
         description: formData.description,
-        definition: { trigger: 'manual', steps: [] },
       });
       setIsModalOpen(false);
       setFormData({ name: '', description: '' });
       await fetchWorkflows();
+      if (created?.id) {
+        setActiveWorkflowId(created.id);
+        setViewMode('canvas');
+      }
     } catch (err) {
       console.error('Failed to create workflow:', err);
     } finally {
@@ -50,10 +56,33 @@ export const WorkflowsPage = () => {
     }
   };
 
+  const handleExecuteQuick = async (e, wfId) => {
+    e.stopPropagation();
+    try {
+      await workflowService.runWorkflow(wfId, { inputs: {} });
+      await fetchWorkflows();
+    } catch (err) {
+      console.error('Failed to execute workflow:', err);
+    }
+  };
+
+  if (viewMode === 'canvas') {
+    return (
+      <WorkflowCanvas
+        workflowId={activeWorkflowId}
+        onBack={() => {
+          setActiveWorkflowId(null);
+          setViewMode('list');
+          fetchWorkflows();
+        }}
+      />
+    );
+  }
+
   if (loading) return <LoadingSpinner label="Loading Automation Workflows..." />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-zinc-100">Automated Workflows</h1>
@@ -76,7 +105,14 @@ export const WorkflowsPage = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {workflows.map((wf) => (
-            <Card key={wf.id} className="hover:border-zinc-700/80 transition-all">
+            <Card
+              key={wf.id}
+              onClick={() => {
+                setActiveWorkflowId(wf.id);
+                setViewMode('canvas');
+              }}
+              className="hover:border-indigo-500/50 cursor-pointer transition-all"
+            >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-lg bg-zinc-800 text-indigo-400 border border-zinc-700/50">
@@ -85,25 +121,42 @@ export const WorkflowsPage = () => {
                   <div>
                     <h3 className="text-sm font-semibold text-zinc-100">{wf.name}</h3>
                     <span className="text-[11px] font-mono text-zinc-500">
-                      {wf.definition?.steps?.length || 3} Pipeline Steps
+                      {wf.nodes?.length || 0} Pipeline Nodes • v{wf.version || 1}
                     </span>
                   </div>
                 </div>
-                <Badge variant={wf.is_enabled ? 'success' : 'neutral'}>
-                  {wf.is_enabled ? 'Active' : 'Disabled'}
+                <Badge variant={wf.status === 'ACTIVE' ? 'success' : 'neutral'}>
+                  {wf.status || 'ACTIVE'}
                 </Badge>
               </div>
 
-              <p className="text-xs text-zinc-400 mt-3 leading-relaxed">{wf.description}</p>
+              <p className="text-xs text-zinc-400 mt-3 leading-relaxed">{wf.description || 'Visual AI Workflow DAG Canvas'}</p>
 
               <div className="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-500">
                   <Clock size={14} />
-                  <span>Scheduled Nightly</span>
+                  <span>Manual / Scheduled</span>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Play size={12} className="mr-1.5" /> Execute Now
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveWorkflowId(wf.id);
+                      setViewMode('canvas');
+                    }}
+                  >
+                    <Edit3 size={12} className="mr-1.5" /> Open Studio
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => handleExecuteQuick(e, wf.id)}
+                  >
+                    <Play size={12} className="mr-1.5" /> Execute
+                  </Button>
+                </div>
               </div>
             </Card>
           ))}
@@ -139,7 +192,7 @@ export const WorkflowsPage = () => {
               Cancel
             </Button>
             <Button type="submit" size="sm" isLoading={submitting}>
-              Save Workflow
+              Save & Open Studio
             </Button>
           </div>
         </form>
@@ -147,3 +200,5 @@ export const WorkflowsPage = () => {
     </div>
   );
 };
+
+export default WorkflowsPage;

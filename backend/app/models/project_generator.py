@@ -1,12 +1,11 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from uuid import UUID, uuid4
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, JSON
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from uuid import UUID as PyUUID, uuid4
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, JSON, UUID
 from sqlalchemy.orm import relationship
 
-from app.database.session import Base
+from app.database.base import Base
 
 
 class ProjectType(str, Enum):
@@ -29,8 +28,8 @@ class ProjectBlueprint(Base):
 
     __tablename__ = "project_blueprints"
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     project_type = Column(String(50), default=ProjectType.WEB_APP.value, nullable=False)
@@ -86,8 +85,8 @@ class BlueprintVersion(Base):
 
     __tablename__ = "blueprint_versions"
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    blueprint_id = Column(PG_UUID(as_uuid=True), ForeignKey("project_blueprints.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    blueprint_id = Column(UUID(as_uuid=True), ForeignKey("project_blueprints.id", ondelete="CASCADE"), nullable=False, index=True)
     version_number = Column(Integer, nullable=False)
     blueprint_json = Column(JSON, default=dict, nullable=False)
     changelog = Column(Text, nullable=True)

@@ -26,6 +26,7 @@ class ConversationContext(BaseModel):
 
 class ProviderRequest(BaseModel):
     prompt: str
+    system_prompt: Optional[str] = None
     context: Optional[ConversationContext] = None
     model: str = "neurodesk-mock-v1"
     temperature: float = 0.7
@@ -73,4 +74,9 @@ class BaseLLMProvider(ABC):
     @abstractmethod
     async def stream_response(self, request: ProviderRequest) -> AsyncGenerator[StreamingChunk, None]:
         """Yields streaming response chunks."""
+        pass
+
+    @abstractmethod
+    async def health_check(self) -> bool:
+        """Returns True if the provider is operational and healthy."""
         pass

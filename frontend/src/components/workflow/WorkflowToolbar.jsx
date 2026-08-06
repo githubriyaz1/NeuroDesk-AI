@@ -1,8 +1,8 @@
 import React from 'react';
 import {
+  ArrowLeft,
   Play,
   Save,
-  FileCode,
   CheckCircle2,
   AlertTriangle,
   History,
@@ -26,6 +26,7 @@ export const WorkflowToolbar = ({
   onToggleConsole,
   onToggleHistory,
   onToggleMiniMap,
+  onBack,
   showConsole,
   showHistory,
   showMiniMap,
@@ -34,6 +35,16 @@ export const WorkflowToolbar = ({
     <div className="h-16 px-6 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between backdrop-blur-md z-20">
       {/* Left Title & Status */}
       <div className="flex items-center space-x-4">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+            title="Back to Workflows List"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+        )}
         <div>
           <div className="flex items-center space-x-2">
             <h2 className="text-base font-bold text-slate-100">{workflow?.name || 'Untitled Workflow'}</h2>
@@ -56,7 +67,7 @@ export const WorkflowToolbar = ({
           ) : (
             <>
               <AlertTriangle className="w-4 h-4 text-rose-400" />
-              <span className="text-rose-400 font-medium" title={validationErrors.join(', ')}>
+              <span className="text-rose-400 font-medium" title={validationErrors?.join(', ')}>
                 Invalid Graph
               </span>
             </>

@@ -20,8 +20,11 @@ class Settings(BaseSettings):
 
     # LLM Platform Configurations
     GEMINI_API_KEY: str = ""
+    GOOGLE_API_KEY: str = ""
+    LLM_PROVIDER: str = "mock"
+    LLM_MODEL: str = "gemini-2.5-flash"
     DEFAULT_LLM_PROVIDER: str = "mock"
-    DEFAULT_MODEL: str = "neurodesk-mock-v1"
+    DEFAULT_MODEL: str = "gemini-2.5-flash"
     REQUEST_TIMEOUT: int = 30
     MAX_RETRIES: int = 3
     MAX_CONTEXT_TOKENS: int = 32000

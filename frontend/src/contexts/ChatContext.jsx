@@ -112,18 +112,23 @@ export const ChatProvider = ({ children }) => {
 
       setMessages((prev) => [...prev, tempUserMsg, tempAssistantMsg]);
 
+      let createdConvId = targetConvId;
+
       // 3. Initiate SSE Streaming
       await chatService.streamResponse({
         conversation_id: targetConvId,
         prompt: promptText,
         stream_id: streamId,
         onChunk: (chunk) => {
+          if (chunk.conversation_id) {
+            createdConvId = chunk.conversation_id;
+          }
           setMessages((prevMsgs) =>
             prevMsgs.map((m) =>
               m.id === assistantMsgId
                 ? {
                     ...m,
-                    content: m.content + chunk.content,
+                    content: m.content + (chunk.content || ''),
                     message_status: chunk.is_final ? 'completed' : 'streaming',
                   }
                 : m
@@ -140,11 +145,15 @@ export const ChatProvider = ({ children }) => {
             )
           );
         },
-        onComplete: () => {
+        onComplete: async (chunk) => {
           setIsSending(false);
           setActiveStreamId(null);
           setActiveMessageId(null);
-          loadConversations();
+          const activeId = chunk?.conversation_id || createdConvId;
+          await loadConversations();
+          if (activeId) {
+            await selectConversation(activeId);
+          }
         },
       });
 
@@ -155,7 +164,7 @@ export const ChatProvider = ({ children }) => {
       setActiveStreamId(null);
       setActiveMessageId(null);
     }
-  }, [activeConversation, isSending, loadConversations]);
+  }, [activeConversation, isSending, loadConversations, selectConversation]);
 
   // Cancel active stream
   const cancelActiveStream = useCallback(async () => {

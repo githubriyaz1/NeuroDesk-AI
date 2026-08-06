@@ -47,7 +47,7 @@ class ProjectGenerationEngine:
                 context_knowledge = {
                     "citations_count": len(kq.citations),
                     "retrieved_context": kq.packaged_context[:1000] if kq.packaged_context else "",
-                    "citations": [c.model_dump() for c in kq.citations],
+                    "citations": [c.model_dump(mode="json") for c in kq.citations],
                 }
             except Exception as err:
                 context_knowledge = {"error": f"Knowledge engine context skipped: {str(err)}"}

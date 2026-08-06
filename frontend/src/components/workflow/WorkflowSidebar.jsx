@@ -103,7 +103,10 @@ export const WorkflowSidebar = ({ onAddNode }) => {
                     onClick={() => onAddNode(node.type, node.label)}
                     draggable
                     onDragStart={(e) => {
-                      e.dataTransfer.setData('application/json', JSON.stringify({ type: node.type, label: node.label }));
+                      const payload = JSON.stringify({ type: node.type, label: node.label });
+                      e.dataTransfer.setData('text/plain', payload);
+                      e.dataTransfer.setData('application/neurodesk-node', payload);
+                      e.dataTransfer.effectAllowed = 'copy';
                     }}
                     className="group p-3 rounded-xl bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800/80 hover:border-cyan-500/40 cursor-grab active:cursor-grabbing transition-all duration-150 flex items-start space-x-3 shadow-sm hover:shadow-cyan-500/10"
                   >

@@ -16,6 +16,9 @@ from app.models.project_generator import (
     BlueprintVersion,
     ProjectType,
 )
+from app.models.ai_studio import AIModel
+from app.models.workspace import Workspace
+from app.models.refresh_token import RefreshToken
 
 __all__ = [
     "User",
@@ -35,4 +38,7 @@ __all__ = [
     "ProjectBlueprint",
     "BlueprintVersion",
     "ProjectType",
+    "AIModel",
+    "Workspace",
+    "RefreshToken",
 ]

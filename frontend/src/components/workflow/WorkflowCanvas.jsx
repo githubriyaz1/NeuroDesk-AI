@@ -9,8 +9,8 @@ import { ExecutionConsole } from './ExecutionConsole';
 import { ExecutionHistoryPanel } from './ExecutionHistoryPanel';
 import { MiniMap } from './MiniMap';
 
-export const WorkflowCanvas = () => {
-  const [workflow, setWorkflow] = useState({
+export const WorkflowCanvas = ({ workflowId, onBack, initialWorkflow }) => {
+  const [workflow, setWorkflow] = useState(initialWorkflow || {
     name: 'New AI Workflow',
     description: 'Visual DAG Execution Studio',
     status: 'DRAFT',
@@ -36,6 +36,7 @@ export const WorkflowCanvas = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isValid, setIsValid] = useState(true);
   const [validationErrors, setValidationErrors] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [showConsole, setShowConsole] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -43,21 +44,34 @@ export const WorkflowCanvas = () => {
 
   const canvasRef = useRef(null);
 
-  // Load starter templates on mount
+  // Fetch workflow details and starter templates on mount or workflowId change
   useEffect(() => {
-    const fetchTemplates = async () => {
+    const initData = async () => {
       try {
         const tmpls = await workflowService.getStarterTemplates();
         setTemplates(tmpls || []);
+
+        if (workflowId) {
+          const wfData = await workflowService.getWorkflow(workflowId);
+          if (wfData) {
+            setWorkflow(wfData);
+            const { valid, errors } = validateGraphLocally(wfData.nodes || [], wfData.edges || []);
+            setIsValid(valid);
+            setValidationErrors(errors);
+          }
+
+          const execs = await workflowService.listExecutions({ workflow_id: workflowId });
+          setExecutions(execs || []);
+        }
       } catch (err) {
-        console.error('Failed to load starter templates:', err);
+        console.error('Failed to load workflow or templates:', err);
       }
     };
-    fetchTemplates();
-  }, []);
+    initData();
+  }, [workflowId]);
 
-  // Simple local DAG validation for cycle detection
-  const validateGraphLocally = (nodes, edges) => {
+  // Local DAG validation for cycle detection
+  const validateGraphLocally = (nodes = [], edges = []) => {
     const hasStart = nodes.some((n) => n.type === 'start');
     const hasEnd = nodes.some((n) => n.type === 'end');
     const errors = [];
@@ -66,18 +80,18 @@ export const WorkflowCanvas = () => {
     return { valid: errors.length === 0, errors };
   };
 
-  const addNode = (type, label) => {
+  const addNodeAtPosition = (type, label, position) => {
     const newNode = {
       id: `${type}_${Date.now()}`,
       type,
       label,
-      position: { x: 300 + Math.random() * 50, y: 200 + Math.random() * 50 },
+      position: position || { x: 300 + Math.random() * 50, y: 200 + Math.random() * 50 },
       data: {},
     };
 
     setWorkflow((prev) => {
-      const updatedNodes = [...prev.nodes, newNode];
-      const { valid, errors } = validateGraphLocally(updatedNodes, prev.edges);
+      const updatedNodes = [...(prev.nodes || []), newNode];
+      const { valid, errors } = validateGraphLocally(updatedNodes, prev.edges || []);
       setIsValid(valid);
       setValidationErrors(errors);
       return { ...prev, nodes: updatedNodes };
@@ -85,10 +99,21 @@ export const WorkflowCanvas = () => {
     setSelectedNode(newNode);
   };
 
+  const addNode = (type, label) => {
+    addNodeAtPosition(type, label, { x: 300 + Math.random() * 50, y: 200 + Math.random() * 50 });
+  };
+
+  const moveNode = (id, newPosition) => {
+    setWorkflow((prev) => ({
+      ...prev,
+      nodes: (prev.nodes || []).map((n) => (n.id === id ? { ...n, position: newPosition } : n)),
+    }));
+  };
+
   const updateNode = (id, updates) => {
     setWorkflow((prev) => ({
       ...prev,
-      nodes: prev.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n)),
+      nodes: (prev.nodes || []).map((n) => (n.id === id ? { ...n, ...updates } : n)),
     }));
     if (selectedNode?.id === id) {
       setSelectedNode((prev) => ({ ...prev, ...updates }));
@@ -97,8 +122,8 @@ export const WorkflowCanvas = () => {
 
   const deleteNode = (id) => {
     setWorkflow((prev) => {
-      const updatedNodes = prev.nodes.filter((n) => n.id !== id);
-      const updatedEdges = prev.edges.filter((e) => e.source !== id && e.target !== id);
+      const updatedNodes = (prev.nodes || []).filter((n) => n.id !== id);
+      const updatedEdges = (prev.edges || []).filter((e) => e.source !== id && e.target !== id);
       const { valid, errors } = validateGraphLocally(updatedNodes, updatedEdges);
       setIsValid(valid);
       setValidationErrors(errors);
@@ -110,7 +135,7 @@ export const WorkflowCanvas = () => {
   const deleteEdge = (id) => {
     setWorkflow((prev) => ({
       ...prev,
-      edges: prev.edges.filter((e) => e.id !== id),
+      edges: (prev.edges || []).filter((e) => e.id !== id),
     }));
     if (selectedEdge?.id === id) setSelectedEdge(null);
   };
@@ -128,12 +153,12 @@ export const WorkflowCanvas = () => {
       };
 
       setWorkflow((prev) => {
-        const edgeExists = prev.edges.some(
+        const edgeExists = (prev.edges || []).some(
           (e) => e.source === newEdge.source && e.target === newEdge.target
         );
         if (edgeExists) return prev;
-        const updatedEdges = [...prev.edges, newEdge];
-        const { valid, errors } = validateGraphLocally(prev.nodes, updatedEdges);
+        const updatedEdges = [...(prev.edges || []), newEdge];
+        const { valid, errors } = validateGraphLocally(prev.nodes || [], updatedEdges);
         setIsValid(valid);
         setValidationErrors(errors);
         return { ...prev, edges: updatedEdges };
@@ -142,22 +167,83 @@ export const WorkflowCanvas = () => {
     setConnectingSource(null);
   };
 
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    try {
+      const rawData = e.dataTransfer.getData('application/neurodesk-node') || e.dataTransfer.getData('text/plain');
+      if (!rawData) return;
+      const { type, label } = JSON.parse(rawData);
+
+      let position = { x: 300 + Math.random() * 50, y: 200 + Math.random() * 50 };
+      if (canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        position = {
+          x: Math.max(20, Math.round(e.clientX - rect.left - 128)),
+          y: Math.max(20, Math.round(e.clientY - rect.top - 30)),
+        };
+      }
+      addNodeAtPosition(type, label, position);
+    } catch (err) {
+      console.error('Failed to handle dropped node:', err);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      if (workflow.id) {
+        const updated = await workflowService.updateWorkflow(workflow.id, {
+          name: workflow.name,
+          description: workflow.description,
+          status: workflow.status,
+          nodes: workflow.nodes || [],
+          edges: workflow.edges || [],
+          variables: workflow.variables || {},
+        });
+        setWorkflow(updated);
+      } else {
+        const created = await workflowService.createWorkflow({
+          name: workflow.name,
+          description: workflow.description,
+          nodes: workflow.nodes || [],
+          edges: workflow.edges || [],
+          variables: workflow.variables || {},
+        });
+        setWorkflow(created);
+      }
+    } catch (err) {
+      console.error('Failed to save workflow:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleRunExecution = async () => {
     setIsRunning(true);
     setShowConsole(true);
     try {
-      // First save/create workflow on backend
       let wfId = workflow.id;
       if (!wfId) {
         const saved = await workflowService.createWorkflow({
           name: workflow.name,
           description: workflow.description,
-          nodes: workflow.nodes,
-          edges: workflow.edges,
-          variables: workflow.variables,
+          nodes: workflow.nodes || [],
+          edges: workflow.edges || [],
+          variables: workflow.variables || {},
         });
         wfId = saved.id;
-        setWorkflow((prev) => ({ ...prev, id: saved.id }));
+        setWorkflow(saved);
+      } else {
+        await workflowService.updateWorkflow(wfId, {
+          nodes: workflow.nodes || [],
+          edges: workflow.edges || [],
+          variables: workflow.variables || {},
+        });
       }
 
       const execRes = await workflowService.runWorkflow(wfId, { inputs: {} });
@@ -170,18 +256,26 @@ export const WorkflowCanvas = () => {
     }
   };
 
+  const handleDuplicate = async () => {
+    if (!workflow.id) return;
+    try {
+      const dup = await workflowService.duplicateWorkflow(workflow.id);
+      setWorkflow(dup);
+    } catch (err) {
+      console.error('Failed to duplicate workflow:', err);
+    }
+  };
+
   const handleLoadTemplate = (templateId) => {
     const tmpl = templates.find((t) => t.id === templateId);
     if (tmpl) {
-      setWorkflow({
+      setWorkflow((prev) => ({
+        ...prev,
         name: tmpl.name,
         description: tmpl.description,
-        status: 'DRAFT',
-        version: 1,
         nodes: tmpl.nodes,
         edges: tmpl.edges,
-        variables: {},
-      });
+      }));
       const { valid, errors } = validateGraphLocally(tmpl.nodes, tmpl.edges);
       setIsValid(valid);
       setValidationErrors(errors);
@@ -198,12 +292,13 @@ export const WorkflowCanvas = () => {
         isRunning={isRunning}
         templates={templates}
         onRun={handleRunExecution}
-        onSave={() => alert('Workflow version saved!')}
+        onSave={handleSave}
         onLoadTemplate={handleLoadTemplate}
-        onDuplicate={() => alert('Workflow duplicated')}
+        onDuplicate={handleDuplicate}
         onToggleConsole={() => setShowConsole(!showConsole)}
         onToggleHistory={() => setShowHistory(!showHistory)}
         onToggleMiniMap={() => setShowMiniMap(!showMiniMap)}
+        onBack={onBack}
         showConsole={showConsole}
         showHistory={showHistory}
         showMiniMap={showMiniMap}
@@ -217,6 +312,8 @@ export const WorkflowCanvas = () => {
         {/* Center Interactive SVG/HTML Graph Canvas */}
         <div
           ref={canvasRef}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
           onClick={() => {
             setSelectedNode(null);
             setSelectedEdge(null);
@@ -239,9 +336,9 @@ export const WorkflowCanvas = () => {
               </marker>
             </defs>
 
-            {workflow.edges.map((edge) => {
-              const sourceNode = workflow.nodes.find((n) => n.id === edge.source);
-              const targetNode = workflow.nodes.find((n) => n.id === edge.target);
+            {(workflow.edges || []).map((edge) => {
+              const sourceNode = (workflow.nodes || []).find((n) => n.id === edge.source);
+              const targetNode = (workflow.nodes || []).find((n) => n.id === edge.target);
               return (
                 <WorkflowEdge
                   key={edge.id}
@@ -258,7 +355,7 @@ export const WorkflowCanvas = () => {
           </svg>
 
           {/* HTML Interactive Nodes Layer */}
-          {workflow.nodes.map((node) => {
+          {(workflow.nodes || []).map((node) => {
             const execNodeState = currentExecution?.nodes?.find((n) => n.node_id === node.id);
             return (
               <WorkflowNode
@@ -271,6 +368,7 @@ export const WorkflowCanvas = () => {
                 onConfigure={(n) => setSelectedNode(n)}
                 onStartConnect={handleStartConnect}
                 onEndConnect={handleEndConnect}
+                onNodeMove={moveNode}
               />
             );
           })}
@@ -278,7 +376,7 @@ export const WorkflowCanvas = () => {
           {/* Overlay MiniMap */}
           {showMiniMap && (
             <div className="absolute bottom-4 left-4 z-20">
-              <MiniMap nodes={workflow.nodes} edges={workflow.edges} />
+              <MiniMap nodes={workflow.nodes || []} edges={workflow.edges || []} />
             </div>
           )}
         </div>

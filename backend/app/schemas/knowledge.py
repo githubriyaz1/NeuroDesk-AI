@@ -15,6 +15,10 @@ class Citation(BaseModel):
     snippet: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
+    def to_badge(self) -> str:
+        page_str = f", Page {self.page_number}" if self.page_number else ""
+        return f"[Source: {self.asset_name}{page_str}]"
+
 
 class RetrievedDocument(BaseModel):
     """Individual document chunk or record retrieved by a BaseRetriever."""

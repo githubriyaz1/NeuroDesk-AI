@@ -80,13 +80,14 @@ class KnowledgeIndexer:
             assets = res.scalars().all()
 
             for asset in assets:
-                text_content = f"Title: {asset.filename}. Category: {asset.category}. Description: {asset.description or 'No description'}"
+                filename = asset.original_filename or asset.name
+                text_content = f"Title: {filename}. Type: {asset.asset_type}. Description: {asset.description or 'No description'}"
                 self.index_asset(
                     asset_id=asset.id,
-                    asset_name=asset.filename,
+                    asset_name=filename,
                     file_type=asset.mime_type,
                     extracted_text=text_content,
-                    metadata_fields={"checksum": asset.checksum_sha256, "file_size": asset.file_size_bytes},
+                    metadata_fields={"checksum": asset.checksum, "file_size": asset.file_size},
                 )
 
             self._last_refresh = datetime.now(timezone.utc)

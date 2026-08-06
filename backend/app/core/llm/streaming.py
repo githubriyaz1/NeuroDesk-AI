@@ -1,12 +1,16 @@
 import asyncio
 import json
+import math
 import time
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional
 from uuid import UUID, uuid4
 
+from sqlalchemy import update
+
 from app.core.logging import logger
-from app.models.chat import MessageStatus
+from app.database.session import AsyncSessionLocal
+from app.models.chat import ChatMessage, MessageStatus
 from app.schemas.chat import StreamingChunk
 
 
@@ -69,7 +73,8 @@ class ResponseAssembler:
         self.completion_status = MessageStatus.STREAMING.value
 
     def append_chunk(self, content: str) -> None:
-        self.chunks.append(content)
+        if content:
+            self.chunks.append(content)
 
     def get_assembled_content(self) -> str:
         return "".join(self.chunks)
@@ -100,11 +105,38 @@ class StreamingSessionManager:
         self.cancellation = cancellation_manager
         self.cache = stream_cache
 
+    async def _persist_final_message(self, message_id: UUID, content: str, status: str, latency_ms: float):
+        """Asynchronously persists the completed/cancelled streamed message back to SQLite DB with retry logic."""
+        max_attempts = 5
+        for attempt in range(1, max_attempts + 1):
+            try:
+                async with AsyncSessionLocal() as session:
+                    stmt = (
+                        update(ChatMessage)
+                        .where(ChatMessage.id == message_id)
+                        .values(
+                            content=content,
+                            markdown=content,
+                            message_status=status,
+                            latency_ms=latency_ms,
+                            updated_at=datetime.now(timezone.utc),
+                        )
+                    )
+                    await session.execute(stmt)
+                    await session.commit()
+                    logger.info(f"Persisted streamed message [{message_id}] status={status} length={len(content)}")
+                    return
+            except Exception as exc:
+                if attempt == max_attempts:
+                    logger.error(f"Failed to persist streamed message [{message_id}] after {max_attempts} attempts: {exc}")
+                else:
+                    await asyncio.sleep(0.2 * attempt)
+
     async def stream_generator(
         self,
         conversation_id: UUID,
         message_id: UUID,
-        chunk_stream: AsyncGenerator[str, None],
+        chunk_stream: AsyncGenerator[Any, None],
         stream_id: Optional[str] = None,
     ) -> AsyncGenerator[str, None]:
         stream_id = stream_id or str(uuid4())
@@ -112,10 +144,16 @@ class StreamingSessionManager:
         assembler = ResponseAssembler(stream_id, conversation_id, message_id)
 
         try:
-            async for text_delta in chunk_stream:
+            async for raw_chunk in chunk_stream:
                 if self.cancellation.is_cancelled(stream_id):
                     logger.info(f"Stream [{stream_id}] cancelled during generation.")
-                    assembler.finalize(MessageStatus.CANCELLED.value)
+                    final_info = assembler.finalize(MessageStatus.CANCELLED.value)
+                    await self._persist_final_message(
+                        message_id,
+                        final_info["content"] + "\n[Generation Cancelled]",
+                        MessageStatus.CANCELLED.value,
+                        final_info["latency_ms"],
+                    )
                     
                     cancel_chunk = StreamingChunk(
                         stream_id=stream_id,
@@ -129,6 +167,14 @@ class StreamingSessionManager:
                     self.cache.add_chunk(cancel_chunk)
                     yield f"data: {cancel_chunk.model_dump_json()}\n\n"
                     break
+
+                # Extract text delta string whether raw_chunk is str or StreamingChunk object
+                if hasattr(raw_chunk, "delta"):
+                    text_delta = raw_chunk.delta or ""
+                elif isinstance(raw_chunk, dict):
+                    text_delta = raw_chunk.get("delta", "")
+                else:
+                    text_delta = str(raw_chunk)
 
                 assembler.append_chunk(text_delta)
                 chunk = StreamingChunk(
@@ -146,6 +192,14 @@ class StreamingSessionManager:
                 await asyncio.sleep(0.01)  # Non-blocking yield
 
             if not self.cancellation.is_cancelled(stream_id):
+                final_info = assembler.finalize(MessageStatus.COMPLETED.value)
+                await self._persist_final_message(
+                    message_id,
+                    final_info["content"],
+                    MessageStatus.COMPLETED.value,
+                    final_info["latency_ms"],
+                )
+                
                 final_chunk = StreamingChunk(
                     stream_id=stream_id,
                     conversation_id=conversation_id,

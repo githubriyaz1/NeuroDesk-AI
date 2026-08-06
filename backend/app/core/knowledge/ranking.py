@@ -23,14 +23,19 @@ class ResultRanker:
         query: str,
         conversation_context: Optional[str] = None,
     ) -> float:
-        query_words = [w.lower() for w in re.findall(r"\w+", query) if len(w) > 2]
+        stopwords = {"the", "and", "this", "that", "what", "how", "are", "there", "for", "with", "show", "give", "tell", "explain", "many", "which", "does"}
+        query_words = [w.lower() for w in re.findall(r"\w+", query) if len(w) > 2 and w.lower() not in stopwords]
         doc_text = f"{doc.asset_name} {doc.content} {doc.section or ''}".lower()
 
         # 1. Keyword Relevance Score (0.35)
         if not query_words:
             keyword_score = 0.5
         else:
-            matches = sum(1 for w in query_words if w in doc_text)
+            matches = 0
+            for w in query_words:
+                stem = w.rstrip("s").rstrip("ing").rstrip("ed")
+                if (len(stem) >= 3 and stem in doc_text) or w in doc_text:
+                    matches += 1
             keyword_score = min(matches / len(query_words), 1.0)
 
         # 2. Metadata Score (0.25)

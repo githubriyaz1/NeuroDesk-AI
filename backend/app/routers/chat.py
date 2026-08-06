@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.llm.streaming import cancellation_manager, stream_cache
+from app.core.logging import logger
 from app.database.session import get_db
 from app.models.user import User
 from app.repositories.chat_repository import conversation_repo, message_repo
@@ -81,7 +82,26 @@ async def stream_chat_response(
     )
 
     history = await message_repo.list_messages(db, conversation_id)
-    provider_name = conv.provider_info_json.get("provider", "mock")
+    provider_info = conv.provider_info_json or {}
+    provider_name = provider_info.get("provider") or getattr(settings, "LLM_PROVIDER", "mock")
+
+    # 4. Query Knowledge Engine for grounding context if available
+    knowledge_context = None
+    citations = None
+    try:
+        from app.core.knowledge.engine import knowledge_engine
+        from app.schemas.knowledge import KnowledgeQueryRequest
+
+        k_res = await knowledge_engine.query_knowledge(
+            owner_id=current_user.id,
+            req=KnowledgeQueryRequest(query=msg_in.prompt, limit=3),
+            db_session=db,
+        )
+        if k_res and k_res.citations:
+            knowledge_context = k_res.packaged_context
+            citations = [c.model_dump(mode="json") for c in k_res.citations]
+    except Exception as exc:
+        logger.warning(f"Knowledge Engine retrieval skipped for chat prompt: {exc}")
 
     return StreamingResponse(
         llm_service.stream_provider_response(
@@ -91,8 +111,10 @@ async def stream_chat_response(
             message_id=assistant_msg.id,
             provider_name=provider_name,
             stream_id=stream_id or str(uuid4()),
+            knowledge_context=knowledge_context,
+            citations=citations,
         ),
-        media_type="text/event-stream",
+        media_type="text/event-stream; charset=utf-8",
     )
 
 

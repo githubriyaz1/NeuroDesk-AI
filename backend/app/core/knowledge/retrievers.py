@@ -1,24 +1,55 @@
 import abc
+import os
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from app.core.logging import logger
 from app.schemas.knowledge import RetrievedDocument
+from app.services.storage_service import storage_service
+
+
+def _read_file_preview(storage_path: str, max_bytes: int = 10000) -> str:
+    """Safely reads raw text preview from asset file on disk."""
+    try:
+        if storage_service.file_exists(storage_path):
+            abs_path = storage_service.get_absolute_path(storage_path)
+            with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                return f.read(max_bytes).strip()
+    except Exception as exc:
+        logger.warning(f"Could not read asset file from storage [{storage_path}]: {exc}")
+    return ""
+
+
+def _query_matches_text(query: str, text: str) -> bool:
+    """Checks if query keywords match candidate document text using word stem matching."""
+    if not query or not query.strip():
+        return True
+    clean_query = re.sub(r"[^\w\s]", " ", query.lower())
+    stopwords = {"the", "and", "this", "that", "what", "how", "are", "there", "for", "with", "show", "give", "tell", "explain", "many", "which", "does", "is"}
+    words = [w for w in clean_query.split() if len(w) >= 2 and w not in stopwords]
+    if not words:
+        return True
+    text_lower = text.lower()
+    for w in words:
+        if w in text_lower or text_lower in w:
+            return True
+        stem = w.rstrip("s").rstrip("ing").rstrip("ed")
+        if len(stem) >= 2 and stem in text_lower:
+            return True
+    tabular_intents = {"employee", "employees", "count", "average", "mean", "median", "highest", "lowest", "total", "age", "tier", "salary", "salaries", "city", "department", "rows", "summary"}
+    if any(w in tabular_intents for w in words):
+        return True
+    return False
 
 
 class BaseRetriever(abc.ABC):
-    """Abstract interface for all knowledge retrievers.
-    
-    Architecture Rule: KnowledgeEngine MUST only communicate with BaseRetriever.
-    New retrievers (e.g. VectorRetriever, SQLRetriever, GitHubRetriever, SharePointRetriever,
-    ConfluenceRetriever, WebRetriever, APIDataRetriever) inherit from BaseRetriever without
-    modifying KnowledgeEngine core.
-    """
+    """Abstract interface for all knowledge retrievers."""
 
     @property
     @abc.abstractmethod
     def retriever_type(self) -> str:
-        """Unique string identifier for the retriever type."""
         pass
 
     @abc.abstractmethod
@@ -30,7 +61,6 @@ class BaseRetriever(abc.ABC):
         asset_ids: Optional[List[UUID]] = None,
         db_session: Optional[Any] = None,
     ) -> List[RetrievedDocument]:
-        """Perform document retrieval for a query strictly scoped to owner_id."""
         pass
 
 
@@ -60,36 +90,43 @@ class PDFRetriever(BaseRetriever):
             stmt = select(Asset).where(
                 Asset.owner_id == owner_id,
                 Asset.is_deleted == False,
-                Asset.mime_type == "application/pdf",
+                (Asset.mime_type == "application/pdf") | (Asset.extension == ".pdf") | (Asset.asset_type == "REPORT"),
             )
             if asset_ids:
                 stmt = stmt.where(Asset.id.in_(asset_ids))
 
-            query_lower = query.lower()
             res = await db_session.execute(stmt)
             pdf_assets = res.scalars().all()
 
             for asset in pdf_assets:
-                text_content = f"{asset.filename} {asset.description or ''}"
-                if any(w in text_content.lower() for w in query_lower.split()):
+                filename = asset.original_filename or asset.name
+                file_text = _read_file_preview(asset.storage_path)
+                combined_text = f"{filename} {asset.description or ''} {file_text}"
+
+                # Extract page number if specified in query
+                page_match = re.search(r"\bpage\s*(\d+)\b", query.lower())
+                page_num = int(page_match.group(1)) if page_match else 1
+
+                if _query_matches_text(query, combined_text) or page_match:
+                    body = file_text if file_text else (asset.description or f"PDF document '{filename}' content")
                     results.append(
                         RetrievedDocument(
-                            id=f"pdf-{asset.id}-p1",
+                            id=f"pdf-{asset.id}-p{page_num}",
                             asset_id=asset.id,
-                            asset_name=asset.filename,
-                            content=f"PDF Document '{asset.filename}': {asset.description or 'PDF document content'}",
+                            asset_name=filename,
+                            content=f"PDF Document '{filename}' [Page {page_num}]:\n{body}",
                             source_type="pdf",
-                            page_number=1,
-                            section="Overview",
-                            score=0.85,
-                            metadata={"file_size": asset.file_size_bytes, "mime_type": asset.mime_type},
+                            page_number=page_num,
+                            section=f"Page {page_num}",
+                            score=0.98 if page_match else 0.92,
+                            metadata={"file_size": asset.file_size, "mime_type": asset.mime_type, "target_page": page_num},
                             created_at=asset.created_at,
                         )
                     )
                 if len(results) >= limit:
                     break
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(f"PDFRetriever failed: {exc}")
 
         return results[:limit]
 
@@ -120,34 +157,40 @@ class CSVRetriever(BaseRetriever):
             stmt = select(Asset).where(
                 Asset.owner_id == owner_id,
                 Asset.is_deleted == False,
-                Asset.mime_type.in_(["text/csv", "application/csv"]),
+                (Asset.mime_type.in_(["text/csv", "application/csv"])) | (Asset.extension == ".csv") | (Asset.asset_type == "SPREADSHEET"),
             )
             if asset_ids:
                 stmt = stmt.where(Asset.id.in_(asset_ids))
 
-            query_lower = query.lower()
             res = await db_session.execute(stmt)
             csv_assets = res.scalars().all()
 
             for asset in csv_assets:
-                if any(w in asset.filename.lower() for w in query_lower.split()):
+                filename = asset.original_filename or asset.name
+                abs_path = storage_service.get_absolute_path(asset.storage_path) if storage_service.file_exists(asset.storage_path) else ""
+                file_text = _read_file_preview(asset.storage_path)
+                combined_text = f"{filename} {asset.description or ''} {file_text}"
+
+                if _query_matches_text(query, combined_text):
+                    body = file_text if file_text else (asset.description or f"CSV dataset '{filename}' content")
+                    path_tag = f" [FILE_PATH: {abs_path}]" if abs_path else ""
                     results.append(
                         RetrievedDocument(
-                            id=f"csv-{asset.id}-headers",
+                            id=f"csv-{asset.id}-data",
                             asset_id=asset.id,
-                            asset_name=asset.filename,
-                            content=f"CSV Dataset '{asset.filename}': Tabular dataset containing rows and columns.",
+                            asset_name=filename,
+                            content=f"CSV Dataset '{filename}'{path_tag}:\n{body}",
                             source_type="csv",
-                            section="Header Summary",
-                            score=0.80,
-                            metadata={"file_size": asset.file_size_bytes, "mime_type": asset.mime_type},
+                            section="Data Rows",
+                            score=0.95,
+                            metadata={"file_size": asset.file_size, "mime_type": asset.mime_type, "abs_path": str(abs_path)},
                             created_at=asset.created_at,
                         )
                     )
                 if len(results) >= limit:
                     break
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(f"CSVRetriever failed: {exc}")
 
         return results[:limit]
 
@@ -186,29 +229,33 @@ class ExcelRetriever(BaseRetriever):
             if asset_ids:
                 stmt = stmt.where(Asset.id.in_(asset_ids))
 
-            query_lower = query.lower()
             res = await db_session.execute(stmt)
             excel_assets = res.scalars().all()
 
             for asset in excel_assets:
-                if any(w in asset.filename.lower() for w in query_lower.split()):
+                filename = asset.original_filename or asset.name
+                file_text = _read_file_preview(asset.storage_path)
+                combined_text = f"{filename} {asset.description or ''} {file_text}"
+
+                if _query_matches_text(query, combined_text):
+                    body = file_text if file_text else (asset.description or f"Excel workbook '{filename}' content")
                     results.append(
                         RetrievedDocument(
                             id=f"excel-{asset.id}-sheet1",
                             asset_id=asset.id,
-                            asset_name=asset.filename,
-                            content=f"Excel Workbook '{asset.filename}': Sheet 1 containing financial/analytical formulas.",
+                            asset_name=filename,
+                            content=f"Excel Workbook '{filename}':\n{body}",
                             source_type="excel",
                             section="Sheet1",
-                            score=0.82,
-                            metadata={"file_size": asset.file_size_bytes, "mime_type": asset.mime_type},
+                            score=0.88,
+                            metadata={"file_size": asset.file_size, "mime_type": asset.mime_type},
                             created_at=asset.created_at,
                         )
                     )
                 if len(results) >= limit:
                     break
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(f"ExcelRetriever failed: {exc}")
 
         return results[:limit]
 
@@ -244,30 +291,32 @@ class MetadataRetriever(BaseRetriever):
             if asset_ids:
                 stmt = stmt.where(Asset.id.in_(asset_ids))
 
-            query_lower = query.lower()
             res = await db_session.execute(stmt)
             pairs = res.all()
 
             for asset, meta in pairs:
-                meta_json_str = str(meta.metadata_json or {}).lower()
-                if any(w in meta_json_str for w in query_lower.split()):
+                filename = asset.original_filename or asset.name
+                abs_path = storage_service.get_absolute_path(asset.storage_path) if storage_service.file_exists(asset.storage_path) else ""
+                path_tag = f" [FILE_PATH: {abs_path}]" if abs_path else ""
+                meta_str = f"{meta.metadata_key}: {meta.metadata_value or ''}"
+                if _query_matches_text(query, meta_str):
                     results.append(
                         RetrievedDocument(
-                            id=f"meta-{asset.id}",
+                            id=f"meta-{asset.id}-{meta.id}",
                             asset_id=asset.id,
-                            asset_name=asset.filename,
-                            content=f"Asset Metadata [{asset.filename}]: {meta.summary_text or str(meta.metadata_json)}",
+                            asset_name=filename,
+                            content=f"Asset Metadata [{filename}]{path_tag}: {meta.metadata_key} = {meta.metadata_value}",
                             source_type="metadata",
                             section="Extracted Attributes",
-                            score=0.90,
-                            metadata=meta.metadata_json or {},
+                            score=0.85,
+                            metadata={meta.metadata_key: meta.metadata_value, "value_type": meta.value_type, "abs_path": str(abs_path)},
                             created_at=asset.created_at,
                         )
                     )
                 if len(results) >= limit:
                     break
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(f"MetadataRetriever failed: {exc}")
 
         return results[:limit]
 
@@ -293,27 +342,39 @@ class SearchRetriever(BaseRetriever):
 
         try:
             from app.services.search_service import search_service
-            from app.schemas.search import SearchQueryRequest
 
-            req = SearchQueryRequest(query=query, page_size=limit)
-            search_res = await search_service.execute_search(db_session, owner_id, req)
+            search_res = await search_service.search(
+                db=db_session,
+                user_id=owner_id,
+                q=query,
+                page=1,
+                page_size=limit,
+            )
 
             for item in search_res.items:
+                asset = item.asset
+                if asset_ids and asset.id not in asset_ids:
+                    continue
+                filename = asset.original_filename or asset.name
+                abs_path = storage_service.get_absolute_path(asset.storage_path) if storage_service.file_exists(asset.storage_path) else ""
+                path_tag = f" [FILE_PATH: {abs_path}]" if abs_path else ""
+                file_text = _read_file_preview(asset.storage_path)
+                body = file_text[:500] if file_text else (asset.description or 'Matching workspace asset.')
                 results.append(
                     RetrievedDocument(
-                        id=f"search-{item.id}",
-                        asset_id=item.id,
-                        asset_name=item.filename,
-                        content=f"Search Result '{item.filename}' ({item.category}): {item.description or 'Matching asset found in index.'}",
+                        id=f"search-{asset.id}",
+                        asset_id=asset.id,
+                        asset_name=filename,
+                        content=f"Search Result '{filename}' ({asset.asset_type}){path_tag}:\n{body}",
                         source_type="search",
                         section="Workspace Index",
-                        score=0.75,
-                        metadata={"category": item.category, "checksum": item.checksum_sha256},
-                        created_at=item.created_at,
+                        score=0.80,
+                        metadata={"asset_type": asset.asset_type, "checksum": asset.checksum, "abs_path": str(abs_path)},
+                        created_at=asset.created_at,
                     )
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(f"SearchRetriever failed: {exc}")
 
         return results[:limit]
 
@@ -349,29 +410,29 @@ class ImageMetadataRetriever(BaseRetriever):
             if asset_ids:
                 stmt = stmt.where(Asset.id.in_(asset_ids))
 
-            query_lower = query.lower()
             res = await db_session.execute(stmt)
             image_assets = res.scalars().all()
 
             for asset in image_assets:
-                if any(w in asset.filename.lower() for w in query_lower.split()):
+                filename = asset.original_filename or asset.name
+                if _query_matches_text(query, filename):
                     results.append(
                         RetrievedDocument(
                             id=f"img-{asset.id}",
                             asset_id=asset.id,
-                            asset_name=asset.filename,
-                            content=f"Image Asset '{asset.filename}': Image resolution and metadata attributes.",
+                            asset_name=filename,
+                            content=f"Image Asset '{filename}': Image resolution and metadata attributes.",
                             source_type="image_metadata",
                             section="EXIF",
                             score=0.70,
-                            metadata={"mime_type": asset.mime_type, "file_size": asset.file_size_bytes},
+                            metadata={"mime_type": asset.mime_type, "file_size": asset.file_size},
                             created_at=asset.created_at,
                         )
                     )
                 if len(results) >= limit:
                     break
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(f"ImageMetadataRetriever failed: {exc}")
 
         return results[:limit]
 

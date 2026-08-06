@@ -40,13 +40,14 @@ class KnowledgeService:
             if not asset:
                 return {"success": False, "message": "Asset not found"}
             
-            text_blob = f"Title: {asset.filename}. Category: {asset.category}. Description: {asset.description or ''}"
+            filename = asset.original_filename or asset.name
+            text_blob = f"Title: {filename}. Type: {asset.asset_type}. Description: {asset.description or ''}"
             self.engine.indexer.index_asset(
                 asset_id=asset.id,
-                asset_name=asset.filename,
+                asset_name=filename,
                 file_type=asset.mime_type,
                 extracted_text=text_blob,
-                metadata_fields={"checksum": asset.checksum_sha256, "file_size": asset.file_size_bytes},
+                metadata_fields={"checksum": asset.checksum, "file_size": asset.file_size},
             )
             return {"success": True, "indexed_count": 1}
 
