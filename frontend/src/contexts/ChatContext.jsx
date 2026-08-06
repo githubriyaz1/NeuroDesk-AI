@@ -118,6 +118,7 @@ export const ChatProvider = ({ children }) => {
       await chatService.streamResponse({
         conversation_id: targetConvId,
         prompt: promptText,
+        attached_assets: attachedAssets.map((a) => a.id),
         stream_id: streamId,
         onChunk: (chunk) => {
           if (chunk.conversation_id) {

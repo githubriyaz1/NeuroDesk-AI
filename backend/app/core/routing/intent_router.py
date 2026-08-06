@@ -62,7 +62,10 @@ class IntentRouter:
     """
 
     def classify_intent(self, query: str) -> Tuple[QueryIntent, float, Optional[int]]:
-        q_lower = query.lower().strip()
+        clean_q = query
+        if "User Question:" in query:
+            clean_q = query.split("User Question:")[-1]
+        q_lower = clean_q.lower().strip()
 
         # 1. Page Specific Queries (e.g. "Explain page 10", "Summarize page 5")
         page_match = re.search(r"\bpage\s*(\d+)\b", q_lower)

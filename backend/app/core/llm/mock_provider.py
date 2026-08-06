@@ -276,13 +276,18 @@ class MockProvider(BaseLLMProvider):
         # ---------------------------------------------------------------------
         # 1. EXCEL / CSV ANALYSIS (Phase 5 — Pandas Dataframe Operations)
         # ---------------------------------------------------------------------
-        if (
-            any(k in prompt_lower for k in ["employee", "employees", "salary", "salaries", "department", "dataset", "how many", "count", "age", "tier", "bangalore", "city", "row", "rows", "duplicate", "duplicates", "dup", "missing", "null", "empty"])
-            or re.search(r"\bna\b", prompt_lower)
-            or intent == "calculate"
-            or "csv dataset" in knowledge_text.lower()
-            or "[file_path:" in knowledge_text.lower()
-        ):
+        from app.core.routing.intent_router import QueryIntent, intent_router
+        classified_intent, _, _ = intent_router.classify_intent(prompt)
+
+        is_csv_query = classified_intent in [
+            QueryIntent.CSV_STATISTICS,
+            QueryIntent.CSV_DISTRIBUTION,
+            QueryIntent.CSV_FILTER,
+            QueryIntent.CSV_GROUPBY,
+            QueryIntent.CSV_CORRELATION,
+        ]
+
+        if is_csv_query:
             stats_output = self._perform_csv_statistics(knowledge_text, prompt)
             print(f"DEBUG generate_response: prompt='{prompt}', intent='{intent}', stats_output_len={len(stats_output)}")
             if stats_output:

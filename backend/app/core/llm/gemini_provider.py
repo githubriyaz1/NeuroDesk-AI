@@ -73,19 +73,21 @@ class GeminiProvider(BaseLLMProvider):
             logger.info("Gemini API key not configured. Falling back to MockProvider.")
             return await self._mock_fallback.generate_response(request)
 
-        # 1. CSV / Spreadsheet Handling: Check if pandas DataFrame engine should handle dataset queries
-        knowledge_text = self._mock_fallback._extract_knowledge_text(request)
-        prompt_lower = request.prompt.lower()
-        is_csv_query = (
-            any(k in prompt_lower for k in ["employee", "employees", "salary", "salaries", "department", "dataset", "how many", "count", "age", "tier", "bangalore", "city", "row", "rows", "duplicate", "duplicates", "dup", "missing", "null", "empty"])
-            or bool(re.search(r"\bna\b", prompt_lower))
-            or self._mock_fallback._detect_intent(request.prompt) == "calculate"
-            or "csv dataset" in knowledge_text.lower()
-            or "[file_path:" in knowledge_text.lower()
-        )
+        # 1. CSV / Spreadsheet Handling: Check if IntentRouter classified this as a CSV query
+        from app.core.routing.intent_router import QueryIntent, intent_router
+        intent, _, _ = intent_router.classify_intent(request.prompt)
+
+        is_csv_query = intent in [
+            QueryIntent.CSV_STATISTICS,
+            QueryIntent.CSV_DISTRIBUTION,
+            QueryIntent.CSV_FILTER,
+            QueryIntent.CSV_GROUPBY,
+            QueryIntent.CSV_CORRELATION,
+        ]
 
         if is_csv_query:
             # Execute exact pandas operations first
+            knowledge_text = self._mock_fallback._extract_knowledge_text(request)
             pandas_stats = self._mock_fallback._perform_csv_statistics(knowledge_text, request.prompt)
             if pandas_stats:
                 elapsed_ms = (time.perf_counter() - start_time) * 1000

@@ -94,7 +94,11 @@ async def stream_chat_response(
 
         k_res = await knowledge_engine.query_knowledge(
             owner_id=current_user.id,
-            req=KnowledgeQueryRequest(query=msg_in.prompt, limit=3),
+            req=KnowledgeQueryRequest(
+                query=msg_in.prompt,
+                asset_ids=msg_in.attached_assets if msg_in.attached_assets else None,
+                limit=3,
+            ),
             db_session=db,
         )
         if k_res and k_res.citations:

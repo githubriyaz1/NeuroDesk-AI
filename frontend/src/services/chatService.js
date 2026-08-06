@@ -110,7 +110,7 @@ export const chatService = {
     return response.data;
   },
 
-  async streamResponse({ conversation_id, prompt, stream_id, onChunk, onError, onComplete }) {
+  async streamResponse({ conversation_id, prompt, attached_assets, stream_id, onChunk, onError, onComplete }) {
     const token = localStorage.getItem('neurodesk_token') || localStorage.getItem('token');
     const response = await fetch(`/api/v1/chat/stream?stream_id=${stream_id || ''}`, {
       method: 'POST',
@@ -118,7 +118,7 @@ export const chatService = {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ conversation_id, prompt }),
+      body: JSON.stringify({ conversation_id, prompt, attached_assets: attached_assets || [] }),
     });
 
     if (!response.ok) {
