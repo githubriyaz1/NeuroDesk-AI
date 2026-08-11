@@ -1,85 +1,196 @@
-# NeuroDesk AI 🧠⚡
+# NeuroDesk AI — Enterprise AI Workspace & Automation Platform
 
-> Enterprise AI-Powered Intelligent Workspace for Data Analysis, AI Studio Modeling & Project Generator, Automated Workflows, Digital Asset Management (DAMS), Enterprise Asset Explorer, Universal Preview Engine (UPE), Metadata & Indexing Engine, Search & Discovery Platform, Enterprise LLM Integration Platform, Real-Time SSE Streaming Engine & Conversation Memory, Enterprise Knowledge Engine (RAG Foundation), AI Data Analyst & Document Intelligence, and Enterprise AI Workflow Automation Studio.
+![NeuroDesk AI Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20React%20%7C%20Vite-blue)
+![Python Version](https://img.shields.io/badge/Python-3.12-green)
+![Tests Passed](https://img.shields.io/badge/Tests-184%20Passed-brightgreen)
+![Build](https://img.shields.io/badge/Build-Production--Ready-success)
 
-[![CI/CD Pipeline](https://github.com/your-org/NeuroDesk-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/NeuroDesk-AI/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/Release-v0.4.7-blue.svg?style=flat&logo=github)](https://github.com/your-org/NeuroDesk-AI/releases/tag/v0.4.7)
-[![Phase 4 Sprint 4.7 Completed](https://img.shields.io/badge/Sprint%204.7-COMPLETED-emerald.svg?style=flat&logo=checkmarx)](https://jwt.io)
-[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB.svg?style=flat&logo=react)](https://reactjs.org)
-[![Tailwind CSS](https://img.shields.io/badge/Styling-Tailwind%20CSS-38B2AC.svg?style=flat&logo=tailwind-css)](https://tailwindcss.com)
-[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791.svg?style=flat&logo=postgresql)](https://www.postgresql.org)
+**NeuroDesk AI** is a production-grade enterprise workspace platform integrating grounded Hybrid RAG document reasoning, exact Pandas CSV data analytics, an official Google Gemini API provider, and a visual Workflow Studio DAG automation canvas with an isolated Python AST sandbox and SSRF-protected HTTP request execution.
 
 ---
 
-## 📌 Executive Summary (Phase 4 Sprint 4.7 Release - v0.4.7)
+## Key Features
 
-**NeuroDesk AI** has completed **Phase 4 Sprint 4.7 (Enterprise AI Studio & Intelligent Project Generator)**. The system provides a flagship AI Studio platform that transforms plain English software ideas into complete 4-tier architectural blueprints with system specifications, functional/non-functional requirements, 4-tier system diagrams, PostgreSQL DDL schemas, REST API specs, folder tree structures, development roadmaps, code templates, versioning, cloning, export options (Markdown/JSON/YAML/PDF), and KnowledgeEngine asset grounding. Verified with 100% test coverage across backend (`54/54` passed) and frontend (`34/34` passed) test suites.
-
----
-
-## 🚀 System Architecture & Sprint Summary
-
-```
-+---------------------------------------------------------------------------------------------------+
-|                                     NEURODESK AI PLATFORM STACK                                    |
-+---------------------------------------------------------------------------------------------------+
-|  Sprint 4.1: AI Conversation Platform Foundation (Conversations, Messages, ORM & Repositories)   |
-|  Sprint 4.2: Enterprise LLM Provider Platform (Mock, Gemini, OpenAI, Claude Abstraction)          |
-|  Sprint 4.3: Real-Time SSE Streaming Engine & Conversation Memory (Budget, Context Window, SSE)   |
-|  Sprint 4.4: Enterprise Knowledge Engine (Parallel Retrievers, Ranking, Citations, Indexing)       |
-|  Sprint 4.5: AI Data Analyst & Document Intelligence (Document, Dataset, Diff, Insights, Export)  |
-|  Sprint 4.6: Enterprise AI Workflow Automation Studio (DAG Engine, Nodes, Execution & Console)    |
-|  Sprint 4.7: Enterprise AI Studio & Project Generator (12 Sub-Engines, Specs, 4-Tier, Exports)     |
-+---------------------------------------------------------------------------------------------------+
-```
-
-### Sprint 4.7 Core Deliverables
-1. **ORM Models (`backend/app/models/project_generator.py`)**: `ProjectBlueprint`, `BlueprintVersion`, `ProjectType`.
-2. **DTO Schemas & Validation (`app/schemas/project_generator.py`)**: `ProjectGenerationRequest`, `BlueprintUpdateRequest`, `ExportRequest`, `ProjectBlueprintResponse`, `BlueprintVersionResponse`, `ProjectTemplateResponse`, `ProjectMetricsResponse`.
-3. **AI Studio Sub-Engines (`app/core/project_generator/`)**:
-   - `requirement_engine.py`: Problem statements, objectives, functional & non-functional requirements.
-   - `tech_stack_engine.py`: 20+ technology stack recommendations.
-   - `architecture_engine.py`: 4-tier system layer specifications, component relationships, security, and scalability.
-   - `database_design_engine.py`: Entity tables, relationships, indexes, and PostgreSQL DDL SQL generator.
-   - `api_contract_engine.py`: Endpoint specifications, HTTP verbs, status codes, and JWT auth strategy.
-   - `folder_structure_engine.py`: Production directory trees with boilerplate file paths.
-   - `prompt_engineering_engine.py`: System prompts, agent roles, and code gen prompt templates.
-   - `code_template_engine.py`: Starter entrypoints, Dockerfiles, and root frontend templates.
-   - `blueprint_engine.py`: Master assembler orchestrating all sub-engines into a cohesive blueprint payload.
-   - `export_engine.py`: Document exporter for Markdown, JSON, YAML, and PDF specifications.
-   - `project_generation_engine.py`: KnowledgeEngine, AnalysisEngine, WorkflowEngine, and LLMService context integration.
-   - `ai_studio_engine.py`: Primary facade coordinating project generation, customization, templates, and analytics metrics.
-4. **Repository & Service (`app/repositories/` & `app/services/project_generator_service.py`)**: Async SQLAlchemy repository with eager loading (`selectinload`), version snapshots, blueprint cloning, updating, and metrics calculation.
-5. **REST Routers (`app/routers/project_generator.py`)**: `/api/v1/ai-studio` endpoints (`/generate`, `/blueprints`, `/blueprints/{id}`, `/blueprints/{id}/clone`, `/export`, `/metrics`, `/templates/starter`).
-6. **Frontend AI Studio Dashboard & Components**: `AIStudioDashboard.jsx`, `ProjectGeneratorWizard.jsx`, `BlueprintViewer.jsx`, `ArchitectureViewer.jsx`, `DatabaseViewer.jsx`, `FolderTreeViewer.jsx`, `APIViewer.jsx`, `RoadmapViewer.jsx`, `TechnologySelector.jsx`, `RequirementEditor.jsx`, `BlueprintHistoryPanel.jsx`, `ExportDialog.jsx`, `generatorService.js`.
+1. **Grounded AI Chat & Hybrid RAG Engine**:
+   - Intent-aware routing (`intent_router.py`) separating PDF document reasoning, Pandas CSV mathematical calculations, and general workspace search.
+   - Grounded citations formatted as `[Filename, Page X]` with zero system prompt/history text leakage.
+   - SSE (Server-Sent Events) live streaming response delivery.
+2. **Exact Pandas CSV Analytics Engine**:
+   - Performs exact mathematical calculations (count, average age, sum, distribution, min/max) directly via Pandas without relying on LLM arithmetic hallucinations.
+3. **Google Gemini LLM Integration**:
+   - Integrated with the official `@google/genai` SDK (`gemini-2.5-flash`).
+   - Seamless fallback to `MockProvider` if no API key is configured or external services time out.
+4. **Visual Workflow Studio & Automation DAG**:
+   - Visual drag-and-drop workflow canvas (`WorkflowCanvas.jsx`).
+   - Isolated Python sandbox executor (`python_sandbox.py`) with AST security auditing and 5.0s subprocess timeout enforcement.
+   - SSRF-protected HTTP request executor (`http_executor.py`) with DNS resolution and private IP blocklists.
+   - Rule-based Data Transform evaluator (`data_transform.py`), active conditional branch routing (`true`/`false`), per-node retries, variable resolution, and JSON import/export.
+5. **Project Architecture Generator**:
+   - Automated tech stack recommendation, risk assessment, and system architecture blueprint generation.
+6. **Multi-Tenant Authorization & Security**:
+   - Strict JWT bearer authentication with server-side ownership checks on all resources (HTTP 404 for unauthorized IDOR attempts).
 
 ---
 
-## 🚀 Quick Start & One-Command Setup
+## Repository Structure
 
-### PowerShell (Windows)
-```powershell
-.\dev.ps1 setup        # Install dependencies
-.\dev.ps1 backend      # Start FastAPI Server (http://localhost:8000)
-.\dev.ps1 frontend     # Start Vite React App (http://localhost:5173)
-.\dev.ps1 test         # Run Pytest & Vitest test suites
-.\dev.ps1 migrate      # Run Alembic DB migrations
-.\dev.ps1 docker-up    # Launch Docker Compose stack
+```
+NeuroDesk-AI/
+├── backend/
+│   ├── app/
+│   │   ├── core/           # RAG, IntentRouter, LLM Providers, Sandbox, Workflow Engine
+│   │   ├── database/       # SQLAlchemy 2.0 sessions & Base models
+│   │   ├── models/         # User, Asset, Chat, Workflow, Project Generator SQLAlchemy models
+│   │   ├── repositories/   # Async Database repository layer
+│   │   ├── routers/        # FastAPI API routes (Auth, Workspace, Chat, Workflow, etc.)
+│   │   ├── schemas/        # Pydantic validation schemas
+│   │   ├── services/       # Domain business logic services
+│   │   └── utils/          # Security & helper utilities
+│   ├── tests/              # 150 automated pytest suites
+│   └── requirements.txt    # Python dependencies
+├── frontend/
+│   ├── src/
+│   │   ├── components/     # UI components (Workflow, Canvas, Chat, Modals, Cards)
+│   │   ├── contexts/       # AuthContext, AssetContext, ChatContext
+│   │   ├── pages/          # Dashboard, Workspace, Chat, Workflows, Studio, Generator
+│   │   ├── services/       # Axios API client services
+│   │   └── __tests__/      # 34 Vitest frontend test suites
+│   ├── package.json
+│   └── vite.config.js
+├── docs/                   # System architecture & developer guides
+├── scratch/                # Verified E2E verification & security audit scripts
+├── .env.example            # Environment configuration template
+└── README.md
 ```
 
-### Bash (Linux / macOS)
+---
+
+## Prerequisites
+
+- **Python**: 3.10+ (Recommended: Python 3.12)
+- **Node.js**: 18+ (Recommended: Node.js 20 LTS)
+- **Git**: 2.30+
+
+---
+
+## Quickstart Guide
+
+### 1. Backend Setup
+
 ```bash
-./dev.sh setup
-./dev.sh backend
-./dev.sh frontend
-./dev.sh test
-./dev.sh migrate
-./dev.sh docker-up
+# Clone the repository
+git clone https://github.com/githubriyaz1/NeuroDesk-AI.git
+cd NeuroDesk-AI/backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# Windows (PowerShell):
+.\venv\Scripts\Activate.ps1
+# Linux/macOS:
+# source venv/bin/activate
+
+# Install backend dependencies
+pip install -r requirements.txt
+
+# Create .env from template
+cp .env.example .env
+```
+
+### 2. Frontend Setup
+
+```bash
+cd ../frontend
+
+# Install frontend dependencies
+npm install
 ```
 
 ---
 
-## 📜 Version & Release Details
-- **Version**: `v0.4.7`
-- **Phase 4 Sprint 4.7 Status**: **COMPLETED & VERIFIED**
+## Running the Application
+
+### Option A: Development Mode
+
+1. **Start Backend Server** (Port 8000):
+   ```bash
+   cd backend
+   venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+   ```
+   API Docs available at: `http://localhost:8000/docs`
+
+2. **Start Frontend Dev Server** (Port 5173):
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+   Access Web App at: `http://localhost:5173`
+
+---
+
+## Running Automated Tests & Verification
+
+### Backend Tests (150 Passed)
+```bash
+cd backend
+$env:PYTHONPATH="."
+venv\Scripts\pytest.exe tests/ -v
+```
+
+### Frontend Tests (34 Passed)
+```bash
+cd frontend
+npm test -- --run
+```
+
+### Frontend Production Build
+```bash
+cd frontend
+npm run build
+```
+
+### E2E Security & Workflow Verification Scripts
+```bash
+# E2E Security & IDOR Audit:
+python scratch/phase6_security_and_auth_audit.py
+
+# E2E Workflow Studio Verification:
+python scratch/verify_phase5_workflows_e2e.py
+```
+
+---
+
+## Environment Variables (.env)
+
+| Variable | Mandatory | Default / Placeholder | Description |
+| :--- | :---: | :--- | :--- |
+| `ENVIRONMENT` | Yes | `development` | Deployment mode (`development`/`production`) |
+| `SECRET_KEY` | Yes | `replace_with_secure_jwt_secret` | JWT signing secret key |
+| `DATABASE_URL` | Yes | `sqlite+aiosqlite:///./neurodesk.db` | Async database URL |
+| `GOOGLE_API_KEY` | No | `your_google_gemini_api_key_here` | Google Gemini API key (Fallback to MockProvider if omitted) |
+| `LLM_PROVIDER` | No | `gemini` | Primary LLM provider (`gemini` or `mock`) |
+| `STORAGE_LOCAL_ROOT` | Yes | `storage/uploads` | Document storage root directory |
+
+---
+
+## Core System Architecture & Documentation Links
+
+Detailed architectural guides are available in the repository root:
+- [ARCHITECTURE.md](file:///d:/PROJECTS/NeuroDesk-AI/ARCHITECTURE.md): System architecture map, data flows, and database schemas.
+- [AI_FEATURES.md](file:///d:/PROJECTS/NeuroDesk-AI/AI_FEATURES.md): Hybrid RAG pipeline, Intent Router, grounded citations, and Pandas CSV engine.
+- [WORKFLOW_GUIDE.md](file:///d:/PROJECTS/NeuroDesk-AI/WORKFLOW_GUIDE.md): Visual Workflow Studio node catalog and execution engine.
+- [SECURITY.md](file:///d:/PROJECTS/NeuroDesk-AI/SECURITY.md): Python AST security sandbox, SSRF blocklists, and IDOR isolation.
+- [TESTING.md](file:///d:/PROJECTS/NeuroDesk-AI/TESTING.md): 184 automated tests breakdown and audit commands.
+- [API_DOCUMENTATION.md](file:///d:/PROJECTS/NeuroDesk-AI/API_DOCUMENTATION.md): Complete REST API specification.
+- [TROUBLESHOOTING.md](file:///d:/PROJECTS/NeuroDesk-AI/TROUBLESHOOTING.md): Common developer errors and port conflict solutions.
+- [HANDOVER.md](file:///d:/PROJECTS/NeuroDesk-AI/HANDOVER.md): Developer handover guide and operational decisions.
+
+---
+
+## Current Release Status
+
+- **Version**: `1.0.0`
+- **Release Status**: **Production-Ready**
+- **Passed Test Coverage**: **184 / 184 Automated Tests Passed (100%)**
+- **Git Branch**: `phase-4-ai-workspace`
