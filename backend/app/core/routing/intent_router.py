@@ -61,7 +61,9 @@ class IntentRouter:
     Classifies queries before retrieval and assigns confidence scores to target retrievers.
     """
 
-    def classify_intent(self, query: str) -> Tuple[QueryIntent, float, Optional[int]]:
+    def classify_intent(
+        self, query: str, attached_asset_types: Optional[List[str]] = None
+    ) -> Tuple[QueryIntent, float, Optional[int]]:
         clean_q = query
         if "User Question:" in query:
             clean_q = query.split("User Question:")[-1]
@@ -101,7 +103,39 @@ class IntentRouter:
         if any(k in q_lower for k in ["correlation", "trend", "histogram"]):
             return QueryIntent.CSV_CORRELATION, 0.90, None
 
-        # 6. PDF Reasoning Intents
+        # 6. Natural Document Explanation Intents ("explain", "explain this pdf", "what is this document about", etc.)
+        doc_explanation_phrases = {
+            "explain",
+            "explain this",
+            "explain this pdf",
+            "explain the pdf",
+            "explain pdf",
+            "explain document",
+            "explain the document",
+            "explain this document",
+            "what is this pdf about",
+            "what is this document about",
+            "what is this file about",
+            "summarize this pdf",
+            "summarize the document",
+            "summarize this document",
+            "summarize pdf",
+            "give me an explanation",
+            "help me understand this pdf",
+            "help me understand this document",
+            "help me understand this",
+            "summarize this",
+            "summary of this pdf",
+            "summary of document",
+            "summarize",
+        }
+        clean_q_nopunct = re.sub(r"[^\w\s]", "", q_lower).strip()
+        if clean_q_nopunct in doc_explanation_phrases or q_lower in doc_explanation_phrases:
+            if attached_asset_types and "csv" in attached_asset_types and "pdf" not in attached_asset_types and "document" not in attached_asset_types:
+                return QueryIntent.CSV_STATISTICS, 0.95, None
+            return QueryIntent.PDF_SUMMARY, 0.95, None
+
+        # 7. PDF Reasoning Intents
         if any(k in q_lower for k in ["mermaid", "sequence diagram", "uml", "flowchart"]):
             return QueryIntent.PDF_DIAGRAM, 0.95, None
         if any(k in q_lower for k in ["architecture", "system design", "component diagram"]):
@@ -118,8 +152,6 @@ class IntentRouter:
             return QueryIntent.PDF_REQUIREMENTS, 0.90, None
         if any(k in q_lower for k in ["executive summary", "executive brief"]):
             return QueryIntent.PDF_SUMMARY, 0.92, None
-        if any(k in q_lower for k in ["explain this pdf", "summarize this pdf", "what is this document about", "key points"]):
-            return QueryIntent.PDF_SUMMARY, 0.95, None
 
         # General Document Query
         if any(k in q_lower for k in ["pdf", "document", "file"]):
@@ -127,9 +159,14 @@ class IntentRouter:
 
         return QueryIntent.GENERAL_QUERY, 0.40, None
 
-    def route_query(self, query: str, requested_types: Optional[List[str]] = None) -> RoutingDecision:
+    def route_query(
+        self,
+        query: str,
+        requested_types: Optional[List[str]] = None,
+        attached_asset_types: Optional[List[str]] = None,
+    ) -> RoutingDecision:
         start_time = time.time()
-        intent, confidence, target_page = self.classify_intent(query)
+        intent, confidence, target_page = self.classify_intent(query, attached_asset_types)
 
         # Select target retrievers based on confidence scoring rules
         target_retrievers: List[str] = []

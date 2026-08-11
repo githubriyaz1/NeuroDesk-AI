@@ -64,6 +64,35 @@ class BaseRetriever(abc.ABC):
         pass
 
 
+def _extract_pdf_page_or_all(storage_path: str, target_page: Optional[int] = None) -> str:
+    """Extracts text from PDF file using pypdf if available, with fallback to text preview."""
+    try:
+        if storage_service.file_exists(storage_path):
+            abs_path = storage_service.get_absolute_path(storage_path)
+            try:
+                import pypdf
+                reader = pypdf.PdfReader(abs_path)
+                if target_page and 1 <= target_page <= len(reader.pages):
+                    p_text = reader.pages[target_page - 1].extract_text()
+                    if p_text and p_text.strip():
+                        return p_text.strip()
+                extracted = []
+                for idx, page in enumerate(reader.pages):
+                    t = page.extract_text()
+                    if t and t.strip():
+                        extracted.append(f"Page {idx + 1}:\n" + t.strip())
+                if extracted:
+                    return "\n\n".join(extracted)
+            except Exception:
+                pass
+
+            with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                return f.read(15000).strip()
+    except Exception as exc:
+        logger.warning(f"Failed to read PDF storage path [{storage_path}]: {exc}")
+    return ""
+
+
 class PDFRetriever(BaseRetriever):
     """Retriever for PDF document pages and text sections."""
 
@@ -100,15 +129,16 @@ class PDFRetriever(BaseRetriever):
 
             for asset in pdf_assets:
                 filename = asset.original_filename or asset.name
-                file_text = _read_file_preview(asset.storage_path)
-                combined_text = f"{filename} {asset.description or ''} {file_text}"
 
                 # Extract page number if specified in query
                 page_match = re.search(r"\bpage\s*(\d+)\b", query.lower())
                 page_num = int(page_match.group(1)) if page_match else 1
 
-                if _query_matches_text(query, combined_text) or page_match:
-                    body = file_text if file_text else (asset.description or f"PDF document '{filename}' content")
+                extracted_body = _extract_pdf_page_or_all(asset.storage_path, page_num)
+                combined_text = f"{filename} {asset.description or ''} {extracted_body}"
+
+                if _query_matches_text(query, combined_text) or page_match or True:
+                    body = extracted_body if extracted_body else (asset.description or f"PDF document '{filename}' content")
                     results.append(
                         RetrievedDocument(
                             id=f"pdf-{asset.id}-p{page_num}",
@@ -119,7 +149,7 @@ class PDFRetriever(BaseRetriever):
                             page_number=page_num,
                             section=f"Page {page_num}",
                             score=0.98 if page_match else 0.92,
-                            metadata={"file_size": asset.file_size, "mime_type": asset.mime_type, "target_page": page_num},
+                            metadata={"file_size": asset.file_size, "mime_type": asset.mime_type, "target_page": page_num, "storage_path": asset.storage_path},
                             created_at=asset.created_at,
                         )
                     )

@@ -304,8 +304,10 @@ class MockProvider(BaseLLMProvider):
 
         # ---------------------------------------------------------------------
         # 2. PDF & DOCUMENT ANALYSIS (Phase 4)
+        # --------------------------------------------------------------        # ---------------------------------------------------------------------
+        # 2. PDF & DOCUMENT ANALYSIS (Phase 4)
         # ---------------------------------------------------------------------
-        elif any(k in prompt_lower for k in ["pdf", "document", "spec", "architecture", "page", "summary", "overview", "roadmap", "risk", "criteria", "test", "requirement"]):
+        elif (len(knowledge_text) > 10 and any(k in prompt_lower for k in ["pdf", "document", "spec", "architecture", "page", "summary", "overview", "roadmap", "risk", "criteria", "test", "requirement", "explain", "what is this", "tell me about"])) or any(k in prompt_lower for k in ["pdf", "document", "page 1", "page 2", "page 3", "page 4", "page 5", "roadmap", "vulnerability", "acceptance criteria"]):
             pdf_snippet = knowledge_text[:500] if len(knowledge_text) > 20 else "Enterprise architecture and system deployment specification for workspace assets."
             
             page_match = re.search(r"\bpage\s*(\d+)\b", prompt_lower)
@@ -371,21 +373,30 @@ class MockProvider(BaseLLMProvider):
                 content = (
                     "### ⚠️ Risk Assessment & Mitigation Plan\n\n"
                     "- **Risk 1: LLM Hallucinations**  \n"
-                      "  *Mitigation*: Enforce strict RAG context grounding and pandas DataFrame math engine.\n"
+                    "  *Mitigation*: Enforce strict RAG context grounding and pandas DataFrame math engine.\n"
                     "- **Risk 2: Unauthorized Data Access**  \n"
-                      "  *Mitigation*: Enforce workspace tenant isolation and JWT token validation.\n\n"
+                    "  *Mitigation*: Enforce workspace tenant isolation and JWT token validation.\n\n"
                     "**Citation**: [Source: Architecture_Spec.pdf, Page 1]"
                 )
             else:
+                filename = "Architecture_Spec.pdf"
+                if "PDF Document '" in knowledge_text:
+                    try:
+                        filename = knowledge_text.split("PDF Document '")[1].split("'")[0]
+                    except Exception:
+                        pass
                 content = (
-                    f"### 📄 PDF Document Analysis & Summary\n\n"
-                    f"Based on **Architecture_Spec.pdf**:\n\n"
-                    f"The document details the hybrid RAG retrieval pipeline, storage management, and AI provider integration.\n\n"
-                    f"#### Key Architectural Highlights:\n"
-                    f"1. **Knowledge Engine**: Multi-retriever parallel search (PDF, CSV, Excel, Metadata).\n"
-                    f"2. **AI Chat Platform**: Real-time SSE streaming with context budget management.\n"
-                    f"3. **Security Controls**: AES-256 storage encryption and role-based access control.\n\n"
-                    f"**Citation**: [Source: Architecture_Spec.pdf, Page 1]"
+                    f"## 📄 PDF Explanation & Analysis\n\n"
+                    f"Based on **{filename}**:\n\n"
+                    f"The document provides technical specifications, operational parameters, and system requirements.\n\n"
+                    f"### Main Areas Covered:\n"
+                    f"1. **System Design & Multi-Tenant Architecture**\n"
+                    f"   - Establishes core system specifications, API design contracts, and data processing workflows.\n\n"
+                    f"2. **Knowledge Engine & Parallel Retrievers**\n"
+                    f"   - Multi-retriever pipeline handles parallel search across PDF, CSV, Excel, and metadata.\n\n"
+                    f"3. **Security & Compliance Controls**\n"
+                    f"   - Enforces role-based access control, tenant data isolation, and audit verification.\n\n"
+                    f"**Source**: `{filename}`, Page 1"
                 )
 
         # ---------------------------------------------------------------------
@@ -430,21 +441,19 @@ class MockProvider(BaseLLMProvider):
         # 5. GENERAL & MULTI-TURN REASONING (Phase 8 & 9)
         # ---------------------------------------------------------------------
         else:
+            clean_user_prompt = request.prompt.split("User Question:")[-1].strip() if "User Question:" in request.prompt else request.prompt
             if len(knowledge_text) > 10:
-                snip = knowledge_text[:250].replace("\n", " ")
+                snip = knowledge_text[:250].replace("\n", " ").strip()
                 content = (
                     f"Based on your workspace documents (*\"{snip}...\"*):\n\n"
-                    f"Here is the answer to your request *'{request.prompt}'*:\n\n"
-                    f"The requested operational flow has been validated against active tenant configurations.\n\n"
+                    f"Here is the analysis for your query (*'{clean_user_prompt}'*):\n\n"
+                    f"The requested operational query has been validated against active workspace context.\n\n"
                     f"**Citation**: [Source: Retrieved Workspace Context]"
                 )
             else:
                 content = (
-                    f"### 🤖 NeuroDesk AI Assistant\n\n"
-                    f"Here is the detailed analysis for your prompt: **{request.prompt}**\n\n"
-                    f"1. **Context Assessment**: Evaluated active workspace state and parameters.\n"
-                    f"2. **Operational Guidelines**: All system pipelines are synchronized.\n\n"
-                    f"Please attach workspace documents (PDF, CSV, Excel, Code) to extract grounded data and citations."
+                    "### 📄 Document Explanation Request\n\n"
+                    "No workspace document is currently attached. Please upload or attach a PDF, document, CSV, or other supported asset so I can analyze and explain it for you."
                 )
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0

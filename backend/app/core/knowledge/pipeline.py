@@ -45,10 +45,15 @@ class KnowledgePipeline:
         clean = " ".join(clean.split())
         return clean
 
-    def select_retrievers(self, query: str, requested_types: Optional[List[str]] = None) -> Tuple[List[BaseRetriever], Any]:
+    def select_retrievers(
+        self,
+        query: str,
+        requested_types: Optional[List[str]] = None,
+        attached_asset_types: Optional[List[str]] = None,
+    ) -> Tuple[List[BaseRetriever], Any]:
         """Selects target retrievers based on IntentRouter confidence scoring and classification."""
         from app.core.routing.intent_router import intent_router
-        decision = intent_router.route_query(query, requested_types)
+        decision = intent_router.route_query(query, requested_types, attached_asset_types)
         
         selected = [r for r_type, r in self._retrievers.items() if r_type in decision.target_retrievers]
         if not selected:
@@ -69,7 +74,28 @@ class KnowledgePipeline:
     ) -> KnowledgeQueryResult:
         start_time = time.time()
         clean_query = self.preprocess_query(query)
-        target_retrievers, decision = self.select_retrievers(clean_query, retriever_types)
+
+        attached_asset_types: List[str] = []
+        if asset_ids and db_session:
+            try:
+                from app.models.asset import Asset
+                from sqlalchemy import select
+                res = await db_session.execute(
+                    select(Asset.mime_type, Asset.extension, Asset.asset_type).where(
+                        Asset.id.in_(asset_ids), Asset.is_deleted == False
+                    )
+                )
+                for mime_type, ext, a_type in res.all():
+                    if mime_type == "application/pdf" or (ext and ext.lower() == ".pdf") or a_type == "REPORT":
+                        attached_asset_types.append("pdf")
+                    elif mime_type in ["text/csv", "application/csv"] or (ext and ext.lower() == ".csv") or a_type == "SPREADSHEET":
+                        attached_asset_types.append("csv")
+                    elif (mime_type and "excel" in mime_type) or (ext and ext.lower() in [".xlsx", ".xls"]):
+                        attached_asset_types.append("excel")
+            except Exception as exc:
+                logger.warning(f"Could not resolve attached asset types: {exc}")
+
+        target_retrievers, decision = self.select_retrievers(clean_query, retriever_types, attached_asset_types)
 
         # 1. Parallel Retrieval via asyncio.gather
         tasks = [
