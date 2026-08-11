@@ -121,7 +121,9 @@ class PDFRetriever(BaseRetriever):
                 Asset.is_deleted == False,
                 (Asset.mime_type == "application/pdf") | (Asset.extension == ".pdf") | (Asset.asset_type == "REPORT"),
             )
-            if asset_ids:
+            if asset_ids is not None:
+                if len(asset_ids) == 0:
+                    return []
                 stmt = stmt.where(Asset.id.in_(asset_ids))
 
             res = await db_session.execute(stmt)
@@ -189,7 +191,9 @@ class CSVRetriever(BaseRetriever):
                 Asset.is_deleted == False,
                 (Asset.mime_type.in_(["text/csv", "application/csv"])) | (Asset.extension == ".csv") | (Asset.asset_type == "SPREADSHEET"),
             )
-            if asset_ids:
+            if asset_ids is not None:
+                if len(asset_ids) == 0:
+                    return []
                 stmt = stmt.where(Asset.id.in_(asset_ids))
 
             res = await db_session.execute(stmt)

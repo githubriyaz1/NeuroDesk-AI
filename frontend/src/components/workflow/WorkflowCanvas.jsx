@@ -266,6 +266,54 @@ export const WorkflowCanvas = ({ workflowId, onBack, initialWorkflow }) => {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      if (workflow.id) {
+        const expData = await workflowService.exportWorkflow(workflow.id);
+        const blob = new Blob([JSON.stringify(expData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${(workflow.name || 'workflow').toLowerCase().replace(/\s+/g, '_')}_export.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const expData = {
+          name: workflow.name,
+          description: workflow.description,
+          nodes: workflow.nodes || [],
+          edges: workflow.edges || [],
+          variables: workflow.variables || {},
+        };
+        const blob = new Blob([JSON.stringify(expData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${(workflow.name || 'workflow').toLowerCase().replace(/\s+/g, '_')}_export.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error('Failed to export workflow:', err);
+    }
+  };
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const imported = await workflowService.importWorkflow(parsed);
+      setWorkflow(imported);
+      const { valid, errors } = validateGraphLocally(imported.nodes || [], imported.edges || []);
+      setIsValid(valid);
+      setValidationErrors(errors);
+    } catch (err) {
+      console.error('Failed to import workflow JSON:', err);
+    }
+  };
+
   const handleLoadTemplate = (templateId) => {
     const tmpl = templates.find((t) => t.id === templateId);
     if (tmpl) {
@@ -293,6 +341,8 @@ export const WorkflowCanvas = ({ workflowId, onBack, initialWorkflow }) => {
         templates={templates}
         onRun={handleRunExecution}
         onSave={handleSave}
+        onExport={handleExport}
+        onImportFile={handleImportFile}
         onLoadTemplate={handleLoadTemplate}
         onDuplicate={handleDuplicate}
         onToggleConsole={() => setShowConsole(!showConsole)}

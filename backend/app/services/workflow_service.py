@@ -147,18 +147,40 @@ class WorkflowService:
         execution.status = ExecutionStatus.CANCELLED.value
         return await self.repo.create_execution(db, execution)
 
-    async def duplicate_workflow(self, db: AsyncSession, owner_id: UUID, workflow_id: UUID) -> Workflow:
+    async def delete_workflow(self, db: AsyncSession, owner_id: UUID, workflow_id: UUID) -> None:
         wf = await self.get_workflow(db, owner_id, workflow_id)
-        dup_payload = WorkflowCreate(
-            name=f"{wf.name} (Copy)",
-            description=wf.description,
-            is_template=False,
-            tags=wf.tags or [],
-            nodes=wf.nodes_json or [],
-            edges=wf.edges_json or [],
-            variables=wf.variables_json or {},
+        await self.repo.delete_workflow(db, wf)
+
+    async def export_workflow(self, db: AsyncSession, owner_id: UUID, workflow_id: UUID) -> Dict[str, Any]:
+        wf = await self.get_workflow(db, owner_id, workflow_id)
+        return {
+            "name": wf.name,
+            "description": wf.description,
+            "version": wf.version,
+            "tags": wf.tags or [],
+            "nodes": wf.nodes_json or [],
+            "edges": wf.edges_json or [],
+            "variables": wf.variables_json or {},
+            "exported_at": wf.updated_at.isoformat() if wf.updated_at else None,
+        }
+
+    async def import_workflow(self, db: AsyncSession, owner_id: UUID, data: Dict[str, Any]) -> Workflow:
+        name = data.get("name", "Imported Workflow")
+        nodes_raw = data.get("nodes", [])
+        edges_raw = data.get("edges", [])
+
+        if not isinstance(nodes_raw, list) or not isinstance(edges_raw, list):
+            raise ValueError("Invalid import payload: 'nodes' and 'edges' must be lists.")
+
+        create_payload = WorkflowCreate(
+            name=f"{name} (Imported)",
+            description=data.get("description", "Imported automation workflow"),
+            tags=data.get("tags", []),
+            nodes=nodes_raw,
+            edges=edges_raw,
+            variables=data.get("variables", {}),
         )
-        return await self.create_workflow(db, owner_id, dup_payload)
+        return await self.create_workflow(db, owner_id, create_payload)
 
 
 workflow_service = WorkflowService()

@@ -9,6 +9,8 @@ import {
   Terminal,
   Map,
   Copy,
+  Download,
+  Upload,
   Sparkles,
   Loader2,
 } from 'lucide-react';
@@ -18,9 +20,11 @@ export const WorkflowToolbar = ({
   isValid,
   validationErrors,
   isRunning,
-  templates,
+  templates = [],
   onRun,
   onSave,
+  onExport,
+  onImportFile,
   onLoadTemplate,
   onDuplicate,
   onToggleConsole,
@@ -96,6 +100,20 @@ export const WorkflowToolbar = ({
 
       {/* Right Actions & Toggles */}
       <div className="flex items-center space-x-2.5">
+        <button
+          type="button"
+          onClick={onExport}
+          className="p-2 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 border border-slate-800 transition-colors"
+          title="Export Workflow JSON"
+        >
+          <Download className="w-4 h-4" />
+        </button>
+
+        <label className="p-2 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 border border-slate-800 cursor-pointer transition-colors" title="Import Workflow JSON">
+          <Upload className="w-4 h-4" />
+          <input type="file" accept=".json" onChange={onImportFile} className="hidden" />
+        </label>
+
         <button
           type="button"
           onClick={onDuplicate}

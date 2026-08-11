@@ -54,6 +54,10 @@ class WorkflowRepository:
         await db.refresh(workflow)
         return workflow
 
+    async def delete_workflow(self, db: AsyncSession, workflow: Workflow) -> None:
+        await db.delete(workflow)
+        await db.flush()
+
     async def create_version(self, db: AsyncSession, version: WorkflowVersion) -> WorkflowVersion:
         db.add(version)
         await db.flush()

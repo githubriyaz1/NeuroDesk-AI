@@ -144,6 +144,46 @@ async def duplicate_workflow(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
+@router.delete("/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_workflow(
+    workflow_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Deletes a workflow and all associated version and execution records."""
+    try:
+        await workflow_service.delete_workflow(db, current_user.id, workflow_id)
+        return None
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/{workflow_id}/export", response_model=Dict[str, Any], status_code=status.HTTP_200_OK)
+async def export_workflow(
+    workflow_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Exports workflow DAG specification as clean JSON."""
+    try:
+        return await workflow_service.export_workflow(db, current_user.id, workflow_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post("/import", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
+async def import_workflow(
+    payload: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Imports workflow DAG specification from JSON."""
+    try:
+        return await workflow_service.import_workflow(db, current_user.id, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 @router.post("/executions/{execution_id}/cancel", response_model=WorkflowExecutionResponse, status_code=status.HTTP_200_OK)
 async def cancel_execution(
     execution_id: UUID,

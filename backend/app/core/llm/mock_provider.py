@@ -269,15 +269,16 @@ class MockProvider(BaseLLMProvider):
         start_time = time.perf_counter()
 
         prompt = request.prompt
-        intent = self._detect_intent(prompt)
+        clean_user_prompt = request.prompt.split("User Question:")[-1].strip() if "User Question:" in request.prompt else request.prompt
+        intent = self._detect_intent(clean_user_prompt)
         knowledge_text = self._extract_knowledge_text(request)
-        prompt_lower = prompt.lower()
+        prompt_lower = clean_user_prompt.lower()
 
         # ---------------------------------------------------------------------
         # 1. EXCEL / CSV ANALYSIS (Phase 5 — Pandas Dataframe Operations)
         # ---------------------------------------------------------------------
         from app.core.routing.intent_router import QueryIntent, intent_router
-        classified_intent, _, _ = intent_router.classify_intent(prompt)
+        classified_intent, _, _ = intent_router.classify_intent(clean_user_prompt)
 
         is_csv_query = classified_intent in [
             QueryIntent.CSV_STATISTICS,
@@ -301,6 +302,22 @@ class MockProvider(BaseLLMProvider):
                     "- **Columns Identified**: `Education`, `JoiningYear`, `City`, `PaymentTier`, `Age`, `Gender`, `EverBenched`\n\n"
                     "**Citation**: [Source: Employee.csv, Dataframe Operations Verified]"
                 )
+
+        # ---------------------------------------------------------------------
+        # 1.5. MULTI-ASSET CROSS COMPARISON (Phase 5)
+        # ---------------------------------------------------------------------
+        elif classified_intent == QueryIntent.MIXED_COMPARISON or "compare" in prompt_lower:
+            content = (
+                "### 🔀 Multi-Asset Cross Comparison (PDF & CSV Dataset)\n\n"
+                "- **PDF Document Context**: Analyzed system specifications and architecture design details from the attached PDF asset.\n"
+                "- **CSV Dataset Context**: Analyzed employee structured records and dataframe metrics from the attached CSV asset.\n\n"
+                "**Key Comparison Findings**:\n"
+                "1. Document requirements align with the scale of structured dataset records.\n"
+                "2. System operational specs provide governance rules for processing dataset attributes.\n\n"
+                "**Citations**:\n"
+                "- [Source: Architecture_Spec.pdf, Page 1]\n"
+                "- [Source: Employee.csv, Dataframe Operations Verified]"
+            )
 
         # ---------------------------------------------------------------------
         # 2. PDF & DOCUMENT ANALYSIS (Phase 4)

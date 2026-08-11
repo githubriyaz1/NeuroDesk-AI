@@ -42,7 +42,7 @@ export const workflowService = {
   },
 
   getStarterTemplates: async () => {
-    const response = await api.get('/workflows/templates/starter');
+    const response = await api.get('/workflows/templates');
     return response.data;
   },
 
@@ -53,6 +53,21 @@ export const workflowService = {
 
   duplicateWorkflow: async (workflowId) => {
     const response = await api.post(`/workflows/${workflowId}/duplicate`);
+    return response.data;
+  },
+
+  deleteWorkflow: async (workflowId) => {
+    const response = await api.delete(`/workflows/${workflowId}`);
+    return response.data;
+  },
+
+  exportWorkflow: async (workflowId) => {
+    const response = await api.get(`/workflows/${workflowId}/export`);
+    return response.data;
+  },
+
+  importWorkflow: async (payload) => {
+    const response = await api.post('/workflows/import', payload);
     return response.data;
   },
 };

@@ -5,7 +5,7 @@ import { Badge } from '../components/common/Badge';
 import { Modal } from '../components/common/Modal';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { EmptyState } from '../components/common/EmptyState';
-import { GitFork, Plus, Play, Clock, Edit3 } from 'lucide-react';
+import { GitFork, Plus, Play, Clock, Edit3, Trash2 } from 'lucide-react';
 import { workflowService } from '../services/workflowService';
 import { WorkflowCanvas } from '../components/workflow/WorkflowCanvas';
 
@@ -63,6 +63,17 @@ export const WorkflowsPage = () => {
       await fetchWorkflows();
     } catch (err) {
       console.error('Failed to execute workflow:', err);
+    }
+  };
+
+  const handleDelete = async (e, wfId) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this workflow?')) return;
+    try {
+      await workflowService.deleteWorkflow(wfId);
+      await fetchWorkflows();
+    } catch (err) {
+      console.error('Failed to delete workflow:', err);
     }
   };
 
@@ -155,6 +166,14 @@ export const WorkflowsPage = () => {
                     onClick={(e) => handleExecuteQuick(e, wf.id)}
                   >
                     <Play size={12} className="mr-1.5" /> Execute
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => handleDelete(e, wf.id)}
+                    className="hover:border-rose-500/50 hover:text-rose-400"
+                  >
+                    <Trash2 size={12} />
                   </Button>
                 </div>
               </div>

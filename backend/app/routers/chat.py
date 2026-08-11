@@ -96,7 +96,7 @@ async def stream_chat_response(
             owner_id=current_user.id,
             req=KnowledgeQueryRequest(
                 query=msg_in.prompt,
-                asset_ids=msg_in.attached_assets if msg_in.attached_assets else None,
+                asset_ids=msg_in.attached_assets if msg_in.attached_assets is not None else None,
                 limit=3,
             ),
             db_session=db,
