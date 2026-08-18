@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend-checks:
-    name: Backend Linting & Pytest
+    name: Backend Linting, Alembic Migrations & Pytest
     runs-on: ubuntu-latest
 
     services:
@@ -33,7 +33,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
           cache-dependency-path: 'backend/requirements.txt'
 
@@ -41,12 +41,20 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-          pip install pytest pytest-asyncio httpx
+
+      - name: Verify Alembic Database Migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://neurodesk_test:test_password@localhost:5432/neurodesk_test_db
+          SECRET_KEY: ci_test_secret_key_neurodesk_2026_enterprise_prod
+          ENVIRONMENT: testing
+        run: |
+          cd backend
+          alembic upgrade head
 
       - name: Run Backend Pytest Suite
         env:
           DATABASE_URL: postgresql+asyncpg://neurodesk_test:test_password@localhost:5432/neurodesk_test_db
-          SECRET_KEY: ci_test_secret_key_neurodesk_2026
+          SECRET_KEY: ci_test_secret_key_neurodesk_2026_enterprise_prod
           ENVIRONMENT: testing
         run: |
           cd backend

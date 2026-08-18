@@ -40,3 +40,6 @@ class ThumbnailResponse(BaseModel):
     has_thumbnail: bool
     message: str
     asset_id: Optional[UUID] = None
+
+
+PreviewResponse = AssetPreviewResponse

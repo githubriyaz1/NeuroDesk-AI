@@ -121,12 +121,15 @@ class AssetService:
         created_asset = await asset_repository.create(db, new_asset)
         logger.info(f"Asset uploaded successfully: {created_asset.id} [{created_asset.original_filename}]")
 
-        # Automatically extract and index asset metadata
+        # Automatically extract metadata and index asset into Knowledge Engine
         try:
             from app.services.metadata_service import metadata_service
             await metadata_service.index_and_persist(db, created_asset)
+
+            from app.services.knowledge_service import knowledge_service
+            await knowledge_service.trigger_index(db, user_id, created_asset.id)
         except Exception as e:
-            logger.error(f"Failed to auto-extract metadata for asset {created_asset.id}: {e}")
+            logger.error(f"Failed to auto-index asset {created_asset.id}: {e}")
 
         return AssetUploadResponse.model_validate(created_asset)
 

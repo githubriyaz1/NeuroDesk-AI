@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { assetService } from '../services/assetService';
 
 const AssetContext = createContext(null);
@@ -12,7 +12,7 @@ export const AssetProvider = ({ children }) => {
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedAssetIds, setSelectedAssetIds] = useState([]);
@@ -84,7 +84,7 @@ export const AssetProvider = ({ children }) => {
     fetchStatistics();
   }, [fetchAssets, fetchStatistics]);
 
-  const selectCategory = (cat) => {
+  const selectCategory = useCallback((cat) => {
     setActiveCategory(cat);
     setSelectedAssetIds([]);
     setPage(1);
@@ -117,47 +117,45 @@ export const AssetProvider = ({ children }) => {
       default:
         break;
     }
-  };
+  }, []);
 
-  const toggleSelectAsset = (assetId) => {
+  const toggleSelectAsset = useCallback((assetId) => {
     setSelectedAssetIds((prev) =>
       prev.includes(assetId) ? prev.filter((id) => id !== assetId) : [...prev, assetId]
     );
-  };
+  }, []);
 
-  const selectAllAssets = () => {
-    if (selectedAssetIds.length === assets.length) {
-      setSelectedAssetIds([]);
-    } else {
-      setSelectedAssetIds(assets.map((a) => a.id));
-    }
-  };
+  const selectAllAssets = useCallback(() => {
+    setSelectedAssetIds((prev) =>
+      prev.length === assets.length ? [] : assets.map((a) => a.id)
+    );
+  }, [assets]);
 
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     setSelectedAssetIds([]);
-  };
+  }, []);
 
-  const openDrawer = (asset) => {
+  const openDrawer = useCallback((asset) => {
     setSelectedAsset(asset);
     setIsDrawerOpen(true);
-  };
+  }, []);
 
-  const closeDrawer = () => {
+  const closeDrawer = useCallback(() => {
     setIsDrawerOpen(false);
     setSelectedAsset(null);
-  };
+  }, []);
 
-  const openPreview = (asset) => {
+  const openPreview = useCallback((asset) => {
     setSelectedAsset(asset);
     setIsPreviewOpen(true);
-  };
+  }, []);
 
-  const closePreview = () => {
+  const closePreview = useCallback(() => {
     setIsPreviewOpen(false);
     setSelectedAsset(null);
-  };
+  }, []);
 
-  const executeBulkAction = async (action) => {
+  const executeBulkAction = useCallback(async (action) => {
     if (selectedAssetIds.length === 0) return;
     try {
       await assetService.executeBulkAction(selectedAssetIds, action);
@@ -167,9 +165,9 @@ export const AssetProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to execute bulk action:', err);
     }
-  };
+  }, [selectedAssetIds, fetchAssets, fetchStatistics]);
 
-  const toggleFavoriteItem = async (assetId, currentFavoriteState) => {
+  const toggleFavoriteItem = useCallback(async (assetId, currentFavoriteState) => {
     try {
       const updated = await assetService.toggleFavorite(assetId, !currentFavoriteState);
       setAssets((prev) => prev.map((a) => (a.id === assetId ? updated : a)));
@@ -178,9 +176,9 @@ export const AssetProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to toggle favorite:', err);
     }
-  };
+  }, [selectedAsset, fetchStatistics]);
 
-  const archiveAssetItem = async (assetId, currentStatus) => {
+  const archiveAssetItem = useCallback(async (assetId, currentStatus) => {
     try {
       const isArchived = currentStatus === 'ARCHIVED';
       const updated = await assetService.toggleArchive(assetId, !isArchived);
@@ -190,9 +188,9 @@ export const AssetProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to toggle archive:', err);
     }
-  };
+  }, [selectedAsset, fetchStatistics]);
 
-  const renameAssetItem = async (assetId, newName, newDescription) => {
+  const renameAssetItem = useCallback(async (assetId, newName, newDescription) => {
     try {
       const updated = await assetService.renameAsset(assetId, newName, newDescription);
       setAssets((prev) => prev.map((a) => (a.id === assetId ? updated : a)));
@@ -201,9 +199,9 @@ export const AssetProvider = ({ children }) => {
       console.error('Failed to rename asset:', err);
       throw err;
     }
-  };
+  }, [selectedAsset]);
 
-  const deleteAssetItem = async (assetId) => {
+  const deleteAssetItem = useCallback(async (assetId) => {
     try {
       const updated = await assetService.deleteAsset(assetId);
       setAssets((prev) => prev.map((a) => (a.id === assetId ? updated : a)));
@@ -212,9 +210,9 @@ export const AssetProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to soft delete asset:', err);
     }
-  };
+  }, [selectedAsset, fetchStatistics]);
 
-  const restoreAssetItem = async (assetId) => {
+  const restoreAssetItem = useCallback(async (assetId) => {
     try {
       const updated = await assetService.restoreAsset(assetId);
       setAssets((prev) => prev.map((a) => (a.id === assetId ? updated : a)));
@@ -223,63 +221,96 @@ export const AssetProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to restore asset:', err);
     }
-  };
+  }, [selectedAsset, fetchStatistics]);
 
-  const downloadAssetItem = async (assetId, filename) => {
+  const downloadAssetItem = useCallback(async (assetId, filename) => {
     try {
       await assetService.downloadAsset(assetId, filename);
     } catch (err) {
       console.error('Failed to download asset:', err);
       throw err;
     }
-  };
+  }, []);
 
-  return (
-    <AssetContext.Provider
-      value={{
-        assets,
-        total,
-        page,
-        pageSize,
-        totalPages,
-        statistics,
-        loading,
-        error,
-        filters,
-        viewMode,
-        activeCategory,
-        selectedAssetIds,
-        selectedAsset,
-        isUploadModalOpen,
-        isDrawerOpen,
-        isPreviewOpen,
-        setViewMode,
-        setPage,
-        setPageSize,
-        setFilters,
-        setIsUploadModalOpen,
-        selectCategory,
-        toggleSelectAsset,
-        selectAllAssets,
-        clearSelection,
-        executeBulkAction,
-        openDrawer,
-        closeDrawer,
-        openPreview,
-        closePreview,
-        fetchAssets,
-        fetchStatistics,
-        toggleFavoriteItem,
-        archiveAssetItem,
-        renameAssetItem,
-        deleteAssetItem,
-        restoreAssetItem,
-        downloadAssetItem,
-      }}
-    >
-      {children}
-    </AssetContext.Provider>
+  const value = useMemo(
+    () => ({
+      assets,
+      total,
+      page,
+      pageSize,
+      totalPages,
+      statistics,
+      loading,
+      error,
+      filters,
+      viewMode,
+      activeCategory,
+      selectedAssetIds,
+      selectedAsset,
+      isUploadModalOpen,
+      isDrawerOpen,
+      isPreviewOpen,
+      setViewMode,
+      setPage,
+      setPageSize,
+      setFilters,
+      setIsUploadModalOpen,
+      selectCategory,
+      toggleSelectAsset,
+      selectAllAssets,
+      clearSelection,
+      executeBulkAction,
+      openDrawer,
+      closeDrawer,
+      openPreview,
+      closePreview,
+      fetchAssets,
+      fetchStatistics,
+      toggleFavoriteItem,
+      archiveAssetItem,
+      renameAssetItem,
+      deleteAssetItem,
+      restoreAssetItem,
+      downloadAssetItem,
+    }),
+    [
+      assets,
+      total,
+      page,
+      pageSize,
+      totalPages,
+      statistics,
+      loading,
+      error,
+      filters,
+      viewMode,
+      activeCategory,
+      selectedAssetIds,
+      selectedAsset,
+      isUploadModalOpen,
+      isDrawerOpen,
+      isPreviewOpen,
+      selectCategory,
+      toggleSelectAsset,
+      selectAllAssets,
+      clearSelection,
+      executeBulkAction,
+      openDrawer,
+      closeDrawer,
+      openPreview,
+      closePreview,
+      fetchAssets,
+      fetchStatistics,
+      toggleFavoriteItem,
+      archiveAssetItem,
+      renameAssetItem,
+      deleteAssetItem,
+      restoreAssetItem,
+      downloadAssetItem,
+    ]
   );
+
+  return <AssetContext.Provider value={value}>{children}</AssetContext.Provider>;
 };
 
 export const useAssets = () => {

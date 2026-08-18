@@ -63,7 +63,7 @@ describe('Sprint 3.3 Enterprise Asset Explorer Frontend Components', () => {
       </AssetProvider>
     );
 
-    expect(screen.getByPlaceholderText('Filter metadata & titles...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Search assets/i)).toBeInTheDocument();
     expect(screen.getByText('Upload Asset')).toBeInTheDocument();
   });
 });

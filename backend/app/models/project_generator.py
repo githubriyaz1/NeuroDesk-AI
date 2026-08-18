@@ -1,34 +1,95 @@
-import uuid
 from datetime import datetime, timezone
-from typing import Dict, Any, List
-from sqlalchemy import DateTime, ForeignKey, String, Text, UUID, JSON
-from sqlalchemy.orm import Mapped, mapped_column
+from enum import Enum
+from typing import Any, Dict, List, Optional
+from uuid import UUID as PyUUID, uuid4
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, JSON, UUID
+from sqlalchemy.orm import relationship
+
 from app.database.base import Base
 
 
-def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+class ProjectType(str, Enum):
+    WEB_APP = "web_app"
+    MOBILE_APP = "mobile_app"
+    DESKTOP_APP = "desktop_app"
+    REST_API = "rest_api"
+    MICROSERVICES = "microservices"
+    AI_APP = "ai_app"
+    MACHINE_LEARNING = "machine_learning"
+    DATA_SCIENCE = "data_science"
+    IOT_APP = "iot_app"
+    ACCESSIBILITY_APP = "accessibility_app"
+    ENTERPRISE_SOFTWARE = "enterprise_software"
+    SAAS_PLATFORM = "saas_platform"
 
 
 class ProjectBlueprint(Base):
+    """Database model for AI Studio Project Blueprints."""
+
     __tablename__ = "project_blueprints"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    idea_description: Mapped[str] = mapped_column(Text, nullable=False)
-    owner_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    architecture_overview: Mapped[str] = mapped_column(Text, nullable=True)
-    database_design: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    api_plan: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    feature_breakdown: Mapped[List[Any]] = mapped_column(JSON, default=list)
-    roadmap: Mapped[List[Any]] = mapped_column(JSON, default=list)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now
-    )
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    project_type = Column(String(50), default=ProjectType.WEB_APP.value, nullable=False)
+    is_template = Column(Boolean, default=False, nullable=False)
+    version = Column(Integer, default=1, nullable=False)
+    
+    # Complete JSON specification blocks
+    blueprint_json = Column(JSON, default=dict, nullable=False)
+    tech_stack_json = Column(JSON, default=dict, nullable=False)
+    architecture_json = Column(JSON, default=dict, nullable=False)
+    requirements_json = Column(JSON, default=dict, nullable=False)
+    database_schema_json = Column(JSON, default=dict, nullable=False)
+    api_contracts_json = Column(JSON, default=dict, nullable=False)
+    folder_tree_json = Column(JSON, default=dict, nullable=False)
+    roadmap_json = Column(JSON, default=dict, nullable=False)
+
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    versions = relationship("BlueprintVersion", back_populates="blueprint", cascade="all, delete-orphan")
+
+    @property
+    def tech_stack(self) -> Dict[str, Any]:
+        return self.tech_stack_json or {}
+
+    @property
+    def architecture(self) -> Dict[str, Any]:
+        return self.architecture_json or {}
+
+    @property
+    def requirements(self) -> Dict[str, Any]:
+        return self.requirements_json or {}
+
+    @property
+    def database_schema(self) -> Dict[str, Any]:
+        return self.database_schema_json or {}
+
+    @property
+    def api_contracts(self) -> Dict[str, Any]:
+        return self.api_contracts_json or {}
+
+    @property
+    def folder_tree(self) -> Dict[str, Any]:
+        return self.folder_tree_json or {}
+
+    @property
+    def roadmap(self) -> Dict[str, Any]:
+        return self.roadmap_json or {}
+
+
+class BlueprintVersion(Base):
+    """Historical version snapshot of an AI Studio project blueprint."""
+
+    __tablename__ = "blueprint_versions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    blueprint_id = Column(UUID(as_uuid=True), ForeignKey("project_blueprints.id", ondelete="CASCADE"), nullable=False, index=True)
+    version_number = Column(Integer, nullable=False)
+    blueprint_json = Column(JSON, default=dict, nullable=False)
+    changelog = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    blueprint = relationship("ProjectBlueprint", back_populates="versions")

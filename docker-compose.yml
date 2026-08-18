@@ -3,20 +3,19 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: neurodesk_postgres
-    restart: always
+    container_name: neurodesk-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-neurodesk}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neurodesk_secret_password}
-      POSTGRES_DB: ${POSTGRES_DB:-neurodesk_db}
+      POSTGRES_USER: neurodesk
+      POSTGRES_PASSWORD: neurodesk_secret_password
+      POSTGRES_DB: neurodesk_db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neurodesk} -d ${POSTGRES_DB:-neurodesk_db}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U neurodesk -d neurodesk_db"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
@@ -24,23 +23,30 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: neurodesk_backend
-    restart: always
+    container_name: neurodesk-backend
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      PROJECT_NAME: "NeuroDesk AI"
+      VERSION: "1.0.0"
+      API_V1_STR: "/api/v1"
+      SECRET_KEY: "super_secret_jwt_key_neurodesk_2026_enterprise_prod"
+      DATABASE_URL: "postgresql+asyncpg://neurodesk:neurodesk_secret_password@postgres:5432/neurodesk_db"
+      STORAGE_LOCAL_ROOT: "storage/uploads"
+      STORAGE_TEMP_DIR: "storage/temp"
+      DEFAULT_STORAGE_PROVIDER: "local"
+      MAX_UPLOAD_SIZE_BYTES: 104857600
+      LOG_LEVEL: "INFO"
     ports:
       - "8000:8000"
-    environment:
-      - ENVIRONMENT=production
-      - API_V1_STR=/api/v1
-      - PROJECT_NAME=NeuroDesk AI
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-neurodesk}:${POSTGRES_PASSWORD:-neurodesk_secret_password}@postgres:5432/${POSTGRES_DB:-neurodesk_db}
-      - SECRET_KEY=${SECRET_KEY:-super_secret_jwt_key_neurodesk_2026_enterprise}
-      - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173","http://localhost:80"]
+    volumes:
+      - dams_uploads:/app/storage/uploads
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
-      interval: 15s
+      interval: 10s
       timeout: 5s
       retries: 3
 
@@ -48,12 +54,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: neurodesk_frontend
-    restart: always
+    container_name: neurodesk-frontend
+    restart: unless-stopped
     ports:
-      - "3000:80"
+      - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:
+  dams_uploads:

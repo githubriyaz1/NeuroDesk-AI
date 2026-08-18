@@ -15,8 +15,19 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
-    # PostgreSQL connection string
-    DATABASE_URL: str = "postgresql+asyncpg://neurodesk:neurodesk_secret_password@localhost:5432/neurodesk_db"
+    # Database connection string (Defaults to SQLite for local development)
+    DATABASE_URL: str = "sqlite+aiosqlite:///./neurodesk.db"
+
+    # LLM Platform Configurations
+    GEMINI_API_KEY: str = ""
+    GOOGLE_API_KEY: str = ""
+    LLM_PROVIDER: str = "mock"
+    LLM_MODEL: str = "gemini-flash-latest"
+    DEFAULT_LLM_PROVIDER: str = "mock"
+    DEFAULT_MODEL: str = "gemini-flash-latest"
+    REQUEST_TIMEOUT: int = 30
+    MAX_RETRIES: int = 3
+    MAX_CONTEXT_TOKENS: int = 32000
     
     # DAMS Core Configuration
     STORAGE_LOCAL_ROOT: str = "storage/uploads"
@@ -27,6 +38,8 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: List[str] = [
         # Documents & Reports
         "txt", "pdf", "doc", "docx", "md", "rtf", "html", "prompt", "log",
+        # Source Code & Scripts
+        "py", "js", "ts", "jsx", "tsx", "cpp", "c", "h", "java", "go", "rs", "sh", "yaml", "yml",
         # Spreadsheets & Datasets
         "csv", "xlsx", "xls", "ods", "json", "parquet", "arrow", "feather", "h5", "hdf5",
         # Images
@@ -82,7 +95,7 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "CRITICAL SECURITY ERROR: In production mode, SECRET_KEY must be explicitly defined and at least 32 characters long."
                 )
-            if "localhost" in self.DATABASE_URL or "neurodesk_secret_password" in self.DATABASE_URL:
+            if "sqlite" in self.DATABASE_URL or "neurodesk_secret_password" in self.DATABASE_URL:
                 raise ValueError(
                     "CRITICAL SECURITY ERROR: In production mode, DATABASE_URL must be configured with secure production database credentials."
                 )

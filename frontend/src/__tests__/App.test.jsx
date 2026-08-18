@@ -7,9 +7,8 @@ import App from '../App';
 describe('NeuroDesk AI Frontend App', () => {
   it('renders application title without crashing', async () => {
     render(<App />);
-    const headings = screen.getAllByText(/NeuroDesk AI/i);
+    const headings = await screen.findAllByText(/NeuroDesk AI/i);
     expect(headings.length).toBeGreaterThan(0);
     expect(headings[0]).toBeInTheDocument();
   });
 });
-

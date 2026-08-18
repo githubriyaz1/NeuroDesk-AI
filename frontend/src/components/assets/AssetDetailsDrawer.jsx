@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { X, Download, Star, Trash2, RotateCcw, Edit2, Check, ShieldCheck, FileText, Database, Image as ImageIcon, Music, Film, Sparkles, Box, Code } from 'lucide-react';
+import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { X, Download, Star, Trash2, RotateCcw, Edit2, Check, ShieldCheck, FileText, Database, Image as ImageIcon, Music, Film, Sparkles, Box, Code, BarChart2, Wand2 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { formatBytes, formatDate } from '../../utils/formatters';
 import { MetadataSection } from './MetadataSection';
+import { ChatContext } from '../../contexts/ChatContext';
 
 const getAssetIcon = (type) => {
   switch (type) {
@@ -43,6 +45,10 @@ export const AssetDetailsDrawer = ({
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const navigate = useNavigate();
+  const chatCtx = useContext(ChatContext);
+  const setAttachedAssets = chatCtx?.setAttachedAssets || (() => {});
+
   useEffect(() => {
     if (asset) {
       setName(asset.name || '');
@@ -64,6 +70,18 @@ export const AssetDetailsDrawer = ({
       console.error('Failed to update asset:', err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSmartAction = (actionType) => {
+    setAttachedAssets([{ id: asset.id, filename: asset.name || asset.original_filename }]);
+    onClose();
+    if (actionType === 'ask_ai') {
+      navigate('/chat');
+    } else if (actionType === 'generate_project') {
+      navigate('/ai-studio');
+    } else {
+      navigate('/workspace');
     }
   };
 
@@ -92,6 +110,31 @@ export const AssetDetailsDrawer = ({
 
           {/* Body Content */}
           <div className="flex-1 overflow-y-auto p-5 space-y-6">
+            {/* Smart AI Action Buttons */}
+            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+              <div className="text-[10px] font-mono uppercase text-cyan-400 font-bold">AI Platform Actions</div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleSmartAction('ask_ai')}
+                  className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold flex items-center gap-1 hover:bg-cyan-500/20"
+                >
+                  <Sparkles size={12} /> Ask AI
+                </button>
+                <button
+                  onClick={() => handleSmartAction('analyze')}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1 hover:bg-indigo-500/20"
+                >
+                  <BarChart2 size={12} /> Analyze
+                </button>
+                <button
+                  onClick={() => handleSmartAction('generate_project')}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-1 hover:bg-emerald-500/20"
+                >
+                  <Wand2 size={12} /> Generate Project
+                </button>
+              </div>
+            </div>
+
             {/* Asset Status & Favorites */}
             <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/60 border border-zinc-800">
               <div className="flex items-center gap-2">

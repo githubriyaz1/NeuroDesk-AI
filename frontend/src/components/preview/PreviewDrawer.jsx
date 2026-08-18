@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { X, Download, RefreshCw, Eye, ShieldCheck, FileText } from 'lucide-react';
+import React, { useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { X, Download, RefreshCw, Eye, ShieldCheck, Sparkles, BarChart2, Wand2, FileText, Image as ImageIcon, Box } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { previewService } from '../../services/previewService';
 import { formatBytes, formatDate } from '../../utils/formatters';
+import { ChatContext } from '../../contexts/ChatContext';
 
 import { PdfPreview } from './PdfPreview';
 import { CsvPreview } from './CsvPreview';
@@ -17,6 +19,10 @@ export const PreviewDrawer = ({ isOpen, onClose, asset, onDownload }) => {
   const [error, setError] = useState(null);
   const [previewData, setPreviewData] = useState(null);
   const [metadataData, setMetadataData] = useState(null);
+  
+  const navigate = useNavigate();
+  const chatCtx = useContext(ChatContext);
+  const setAttachedAssets = chatCtx?.setAttachedAssets || (() => {});
 
   const fetchPreviewData = async () => {
     if (!asset) return;
@@ -49,6 +55,109 @@ export const PreviewDrawer = ({ isOpen, onClose, asset, onDownload }) => {
   if (!isOpen || !asset) return null;
 
   const previewType = previewData?.preview_type || 'UNSUPPORTED';
+
+  const handleSmartAction = (actionType) => {
+    setAttachedAssets([{ id: asset.id, filename: asset.name || asset.original_filename }]);
+    onClose();
+    if (actionType === 'ask_ai') {
+      navigate('/chat');
+    } else if (actionType === 'generate_project') {
+      navigate('/ai-studio');
+    } else {
+      navigate('/workspace');
+    }
+  };
+
+  const renderSmartActionButtons = () => {
+    const isDataset = ['CSV', 'EXCEL', 'DATASET', 'SPREADSHEET'].includes(previewType) || asset.asset_type === 'DATASET';
+    const isImage = previewType === 'IMAGE' || asset.asset_type === 'IMAGE';
+
+    if (isDataset) {
+      return (
+        <div className="flex flex-wrap gap-2 pt-2 pb-1 border-b border-zinc-800/80">
+          <button
+            onClick={() => handleSmartAction('analyze')}
+            className="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1 hover:bg-indigo-500/20"
+          >
+            <BarChart2 size={12} /> Analyze
+          </button>
+          <button
+            onClick={() => handleSmartAction('analyze')}
+            className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1 hover:bg-slate-700"
+          >
+            <Box size={12} /> Statistics
+          </button>
+          <button
+            onClick={() => handleSmartAction('analyze')}
+            className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1 hover:bg-slate-700"
+          >
+            <Eye size={12} /> Visualize
+          </button>
+          <button
+            onClick={() => handleSmartAction('ask_ai')}
+            className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold flex items-center gap-1 hover:bg-cyan-500/20"
+          >
+            <Sparkles size={12} /> Ask AI
+          </button>
+        </div>
+      );
+    }
+
+    if (isImage) {
+      return (
+        <div className="flex flex-wrap gap-2 pt-2 pb-1 border-b border-zinc-800/80">
+          <button
+            onClick={() => handleSmartAction('ask_ai')}
+            className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold flex items-center gap-1 hover:bg-cyan-500/20"
+          >
+            <ImageIcon size={12} /> Describe
+          </button>
+          <button
+            onClick={() => handleSmartAction('ask_ai')}
+            className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1 hover:bg-slate-700"
+          >
+            <FileText size={12} /> OCR Text
+          </button>
+          <button
+            onClick={() => handleSmartAction('ask_ai')}
+            className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold flex items-center gap-1 hover:bg-cyan-500/20"
+          >
+            <Sparkles size={12} /> Ask AI
+          </button>
+        </div>
+      );
+    }
+
+    // Default PDF / Document buttons
+    return (
+      <div className="flex flex-wrap gap-2 pt-2 pb-1 border-b border-zinc-800/80">
+        <button
+          onClick={() => handleSmartAction('analyze')}
+          className="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1 hover:bg-indigo-500/20"
+        >
+          <BarChart2 size={12} /> Analyze
+        </button>
+        <button
+          onClick={() => handleSmartAction('ask_ai')}
+          className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1 hover:bg-slate-700"
+        >
+          <FileText size={12} /> Summarize
+        </button>
+        <button
+          onClick={() => handleSmartAction('ask_ai')}
+          className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold flex items-center gap-1 hover:bg-cyan-500/20"
+        >
+          <Sparkles size={12} /> Ask AI
+        </button>
+        <button
+          onClick={() => handleSmartAction('generate_project')}
+          className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-1 hover:bg-emerald-500/20"
+        >
+          <Wand2 size={12} /> Generate Project
+        </button>
+      </div>
+    );
+  };
 
   const renderPreviewComponent = () => {
     if (loading) {
@@ -112,7 +221,10 @@ export const PreviewDrawer = ({ isOpen, onClose, asset, onDownload }) => {
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+            {/* Smart Action Buttons */}
+            {renderSmartActionButtons()}
+
             {/* Metadata Summary Strip */}
             <div className="p-3 rounded-lg bg-zinc-900/60 border border-zinc-800 text-xs flex flex-wrap justify-between gap-2 text-zinc-400">
               <div>

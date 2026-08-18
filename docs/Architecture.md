@@ -1,80 +1,50 @@
-# NeuroDesk AI Enterprise System Architecture
+# NeuroDesk AI Enterprise Architecture Specification
 
-## Architectural Principles
+> Release Version: **v0.4.7**  
+> Status: **PHASE 4 SPRINT 4.7 COMPLETED & VERIFIED**
 
-NeuroDesk AI is built adhering to enterprise software engineering standards:
+---
 
-1. **Separation of Concerns**: Clean isolation between UI components, API routes, business logic services, data access layers, and storage providers.
-2. **Domain Driven Design (DDD)**: Organization of code around domain models: Auth, Users, Digital Assets (DAMS), Universal Preview Engine (UPE), Workspace, AI Studio, Project Generator, AI Chat, and Workflows.
-3. **Pluggable Preview Engine (UPE)**: `PreviewService` manages dynamic provider resolution (`PDFPreviewProvider`, `CSVPreviewProvider`, `ExcelPreviewProvider`, `ImagePreviewProvider`, `UnsupportedPreviewProvider`). New format providers (such as DOCX, PPTX, Audio, or Video) can be added cleanly without modifying `PreviewService`.
-4. **Pluggable Storage Layer**: DAMS Core utilizes `StorageService` wrapping abstract `StorageProvider` (defaulting to `LocalStorageProvider` under `storage/uploads/{user_id}/{year}/{month}/`), allowing future cloud providers (AWS S3, Azure Blob, GCS) to plug in with zero changes to business logic.
-5. **Stateless API Gateway**: FastAPI backend designed to scale horizontally across multiple container instances with stateless JWT sessions and database-backed refresh token rotation.
-6. **Modern Minimalist UI**: Sleek dark-theme design pattern adhering to Vercel/Linear UX guidelines.
+## 🏗️ 4-Tier Enterprise Architecture Pattern
 
-## Universal Preview Engine (UPE Subsystem)
-
-### UPE Lifecycle & Provider Resolution
-1. **Provider Resolution**:
-   - `PreviewService` maintains an ordered list of concrete providers (`PDFPreviewProvider`, `CSVPreviewProvider`, `ExcelPreviewProvider`, `ImagePreviewProvider`).
-   - For any target asset, `PreviewService.select_provider(asset)` evaluates `can_handle(asset_type, mime_type, extension)`.
-   - If no specialized provider matches, `UnsupportedPreviewProvider` handles the request gracefully.
-2. **Preview Payloads**:
-   - `PDF`: Extracts page count, document title, author, and page 1 text snippet.
-   - `CSV`: Extracts column headers, column count, row count, and first 50 sample data rows.
-   - `Excel`: Extracts sheet names, active sheet title, and 50 rows per sheet.
-   - `Image`: Extracts width, height, resolution, color mode, format, and aspect ratio.
-   - `Unsupported`: Returns `can_preview = False` and explanatory message.
-
-## Digital Asset Management System (DAMS Core)
-
-### DAMS Lifecycle & Storage Architecture
-1. **Asset Model**:
-   - `UUID` primary public key (`id`).
-   - Ownership bound to `owner_id` (User UUID).
-   - Categorized into 9 strict Asset Types: `DOCUMENT`, `SPREADSHEET`, `DATASET`, `IMAGE`, `AUDIO`, `REPORT`, `PROMPT`, `MODEL`, `VIDEO`.
-   - Tracked across 7 Asset Statuses: `CREATED`, `UPLOADING`, `PROCESSING`, `READY`, `FAILED`, `ARCHIVED`, `DELETED`.
-2. **Storage Isolation**:
-   - Internal physical storage path (`storage_path`) is **never** exposed to the frontend API client.
-   - File downloads are served via authorized, streaming API endpoints (`GET /api/v1/assets/{id}/download`).
-   - Files stored on disk under `storage/uploads/{user_id}/{year}/{month}/{unique_filename}` to avoid directory bloat and filename collisions.
-   - SHA-256 checksums computed during upload stream for integrity verification.
-
-## System Component Diagram
+Every backend domain follows a strict 4-tier dependency structure:
 
 ```
-+-----------------------------------------------------------------------+
-|                           CLIENT LAYER                                |
-|                                                                       |
-|   React 18 + Vite Single Page Application                             |
-|   ├── AuthContext (Global Session State & Token Manager)              |
-|   ├── AssetContext & useAssets (DAMS State & Upload Queue Manager)    |
-|   ├── PreviewDrawer (Universal Preview Engine Modal / Drawer)         |
-|   │   └── Renderers: PdfPreview, CsvPreview, ExcelPreview, Image...   |
-|   ├── ProtectedRoute Guard (Redirects unauthenticated to /login)      |
-|   ├── Pages: Login, Register, Profile, Workspace DAMS, AI Studio...   |
-|   └── Axios Interceptors (Auto Token Refresh on HTTP 401)             |
-+-----------------------------------┬-----------------------------------+
-                                    | REST API Calls (JSON & Multipart)
-                                    v
-+-----------------------------------------------------------------------+
-|                           BACKEND LAYER                               |
-|                                                                       |
-|   FastAPI Application Gateway                                         |
-|   ├── CORS & Security Middleware                                      |
-|   ├── Request Timing & Logging Middleware                             |
-|   ├── Centralized Exception Handlers                                  |
-|   ├── Auth Router (/api/v1/auth/register, login, refresh, logout)     |
-|   ├── Users Router (/api/v1/users/me, profile, change-password)       |
-|   ├── Assets Router (/api/v1/assets/upload, download, list, stats...) |
-|   ├── UPE Preview Endpoints (/api/v1/assets/{id}/preview, metadata)   |
-|   └── Service Layer (AuthService, AssetService, PreviewService)       |
-+-----------------------------------┬-----------------------------------+
-                                    | Async DB & Storage Operations
-                                    v
-+-----------------------------------┴-----------------------------------+
-|                        DATA & STORAGE LAYER                           |
-|                                                                       |
-|   ├── PostgreSQL 16 DB (users, refresh_tokens, assets, workspaces)    |
-|   └── Pluggable Storage (LocalStorageProvider -> storage/uploads/...) |
-+-----------------------------------------------------------------------+
+[ HTTP Router Layer ] -> [ Domain Service Layer ] -> [ Repository DB Layer ] -> [ SQLAlchemy Models ]
+     (FastAPI)                (Business Logic)             (Database Queries)            (ORMs)
 ```
+
+1. **Router Layer (`backend/app/routers/`)**: REST controllers parsing request parameters, enforcing authentication (`get_current_user`), and serializing response DTOs (`project_generator.py`, `workflow.py`).
+2. **Domain Service Layer (`backend/app/services/`)**: Orchestrates business rules, search syntax parsing (`QueryParser`), preview generation (`PreviewService`), metadata extraction (`MetadataService`), file storage (`StorageService`), LLM execution & retries (`LLMService`), AI Chat (`AIChatService`), Enterprise Knowledge Engine (`KnowledgeService`), AI Data Analyst (`AnalysisService`), AI Workflow Studio (`WorkflowService`), and AI Studio Project Generator (`ProjectGeneratorService`).
+3. **Core AI Studio & Project Generator Engine (`backend/app/core/project_generator/`)**:
+   - `requirement_engine.py`: Problem statements, objectives, functional & non-functional requirements.
+   - `tech_stack_engine.py`: 20+ technology stack recommendations.
+   - `architecture_engine.py`: 4-tier system layer specifications, component relationships, security, and scalability.
+   - `database_design_engine.py`: Entity tables, relationships, indexes, and PostgreSQL DDL SQL generator.
+   - `api_contract_engine.py`: Endpoint specifications, HTTP verbs, status codes, and JWT auth strategy.
+   - `folder_structure_engine.py`: Production directory trees with boilerplate file paths.
+   - `prompt_engineering_engine.py`: System prompts, agent roles, and code gen prompt templates.
+   - `code_template_engine.py`: Starter entrypoints, Dockerfiles, and root frontend templates.
+   - `blueprint_engine.py`: Master assembler orchestrating all sub-engines into a cohesive blueprint payload.
+   - `export_engine.py`: Document exporter for Markdown, JSON, YAML, and PDF specifications.
+   - `project_generation_engine.py`: KnowledgeEngine, AnalysisEngine, WorkflowEngine, and LLMService context integration.
+   - `ai_studio_engine.py`: Primary facade coordinating project generation, customization, templates, and analytics metrics.
+4. **Repository Layer (`backend/app/repositories/`)**: Performs async database access (`ProjectGeneratorRepository`, `WorkflowRepository`, `ConversationRepository`, `ChatMessageRepository`, `KnowledgeRepository`) enforcing user tenancy checks (`owner_id == user_id`) and eager relationship loading (`selectinload`).
+5. **Model / Database Layer (`backend/app/models/`)**: SQLAlchemy declarative models (`ProjectBlueprint`, `BlueprintVersion`, `Workflow`, `WorkflowVersion`, `WorkflowExecution`, `User`, `Asset`).
+
+---
+
+## ⚡ Frontend Architecture & AI Studio Components
+
+- **State Management**: React Context (`AuthContext`, `ThemeContext`, `AssetContext`, `ChatContext`) optimized with `useMemo` and `useCallback` to prevent unnecessary re-renders.
+- **AI Studio Dashboard (`AIStudioDashboard.jsx`)**: Central hub rendering metrics badges, starter template gallery, saved blueprint list, and active blueprint viewer.
+- **Components**: `ProjectGeneratorWizard.jsx`, `BlueprintViewer.jsx`, `ArchitectureViewer.jsx`, `DatabaseViewer.jsx`, `FolderTreeViewer.jsx`, `APIViewer.jsx`, `RoadmapViewer.jsx`, `TechnologySelector.jsx`, `RequirementEditor.jsx`, `BlueprintHistoryPanel.jsx`, `ExportDialog.jsx`.
+- **Services (`generatorService.js`)**: Async client managing project blueprint generation, list fetching, detail retrieval, updates, cloning, exports, starter templates, and metrics analytics.
+
+---
+
+## 🗄️ Database & Migration Strategy
+
+- **ORM**: Async SQLAlchemy 2.0 with `asyncpg` (PostgreSQL) or `aiosqlite` (SQLite dev).
+- **Migration Tool**: Alembic async runner (`backend/alembic/versions/`).
+- **Schema**: Tables for `users`, `refresh_tokens`, `assets`, `asset_metadata`, `conversations`, `chat_messages`, `workflows`, `workflow_versions`, `project_blueprints`, `blueprint_versions`.
