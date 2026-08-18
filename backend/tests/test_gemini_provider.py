@@ -63,7 +63,12 @@ async def test_gemini_provider_streaming_fallback():
 
 
 @pytest.mark.asyncio
-async def test_gemini_provider_health_check():
+async def test_gemini_provider_health_check(monkeypatch):
     """Verify health_check() returns True when configured and False when key missing."""
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "GOOGLE_API_KEY", "")
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
     no_key_provider = GeminiProvider(api_key="")
     assert await no_key_provider.health_check() is False
