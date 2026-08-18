@@ -87,7 +87,9 @@ def _extract_pdf_page_or_all(storage_path: str, target_page: Optional[int] = Non
                 pass
 
             with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-                return f.read(15000).strip()
+                raw_text = f.read(15000).strip()
+                if not raw_text.startswith("%PDF-"):
+                    return raw_text
     except Exception as exc:
         logger.warning(f"Failed to read PDF storage path [{storage_path}]: {exc}")
     return ""
@@ -260,7 +262,9 @@ class ExcelRetriever(BaseRetriever):
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 ]),
             )
-            if asset_ids:
+            if asset_ids is not None:
+                if len(asset_ids) == 0:
+                    return []
                 stmt = stmt.where(Asset.id.in_(asset_ids))
 
             res = await db_session.execute(stmt)
@@ -268,6 +272,8 @@ class ExcelRetriever(BaseRetriever):
 
             for asset in excel_assets:
                 filename = asset.original_filename or asset.name
+                abs_path = storage_service.get_absolute_path(asset.storage_path) if storage_service.file_exists(asset.storage_path) else ""
+                path_tag = f" [FILE_PATH: {abs_path}]" if abs_path else ""
                 file_text = _read_file_preview(asset.storage_path)
                 combined_text = f"{filename} {asset.description or ''} {file_text}"
 
@@ -278,11 +284,11 @@ class ExcelRetriever(BaseRetriever):
                             id=f"excel-{asset.id}-sheet1",
                             asset_id=asset.id,
                             asset_name=filename,
-                            content=f"Excel Workbook '{filename}':\n{body}",
+                            content=f"Excel Workbook '{filename}'{path_tag}:\n{body}",
                             source_type="excel",
                             section="Sheet1",
                             score=0.88,
-                            metadata={"file_size": asset.file_size, "mime_type": asset.mime_type},
+                            metadata={"file_size": asset.file_size, "mime_type": asset.mime_type, "abs_path": str(abs_path)},
                             created_at=asset.created_at,
                         )
                     )

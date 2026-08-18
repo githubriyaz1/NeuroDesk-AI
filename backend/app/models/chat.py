@@ -17,6 +17,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.config import settings
 from app.database.base import Base
 
 
@@ -65,7 +66,9 @@ class Conversation(Base):
     settings_json: Mapped[Dict[str, Any]] = mapped_column(
         JSON,
         default=lambda: {
-            "model": "neurodesk-mock-v1",
+            "model": getattr(settings, "LLM_MODEL", "gemini-2.5-flash")
+            if getattr(settings, "LLM_PROVIDER", "mock") == "gemini"
+            else "neurodesk-mock-v1",
             "temperature": 0.7,
             "max_tokens": 4096,
             "system_prompt": "You are NeuroDesk AI, an intelligent workspace assistant.",
@@ -74,7 +77,11 @@ class Conversation(Base):
     )
     provider_info_json: Mapped[Dict[str, Any]] = mapped_column(
         JSON,
-        default=lambda: {"provider": "mock", "api_version": "v1"},
+        default=lambda: {
+            "provider": getattr(settings, "LLM_PROVIDER", "mock"),
+            "api_version": "v1",
+            "is_explicit": False,
+        },
         nullable=False,
     )
 

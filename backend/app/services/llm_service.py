@@ -126,14 +126,34 @@ class LLMService:
         else:
             full_prompt = current_prompt
 
-        active_provider_name = provider_name or getattr(settings, "LLM_PROVIDER", "mock")
+        configured_provider = getattr(settings, "LLM_PROVIDER", "mock")
+        conv_provider = (conversation.provider_info_json or {}).get("provider", "mock") if conversation else "mock"
+        active_provider_name = provider_name or configured_provider
         provider = LLMProviderFactory.get_provider(active_provider_name)
+
+        model_name = conversation.settings_json.get("model", settings.DEFAULT_MODEL) if conversation and conversation.settings_json else settings.DEFAULT_MODEL
+        if active_provider_name == "gemini" and ("mock" in model_name.lower() or not model_name):
+            model_name = getattr(settings, "LLM_MODEL", "gemini-2.5-flash")
+
+        gemini_started = (active_provider_name == "gemini")
+        gemini_succeeded = gemini_started and await provider.health_check()
+        mock_fallback = not gemini_succeeded if gemini_started else (active_provider_name == "mock")
+
+        logger.info(
+            f"CHAT_PROVIDER_CONFIGURED={configured_provider}\n"
+            f"CHAT_CONVERSATION_PROVIDER={conv_provider}\n"
+            f"CHAT_PROVIDER_SELECTED={active_provider_name}\n"
+            f"CHAT_GEMINI_REQUEST_STARTED={str(gemini_started).lower()}\n"
+            f"CHAT_GEMINI_REQUEST_SUCCEEDED={str(gemini_succeeded).lower()}\n"
+            f"CHAT_MOCK_FALLBACK={str(mock_fallback).lower()}"
+        )
+
         req = ProviderRequest(
             prompt=full_prompt,
             system_prompt=sys_prompt_text,
-            model=conversation.settings_json.get("model", settings.DEFAULT_MODEL),
-            temperature=conversation.settings_json.get("temperature", 0.7),
-            max_tokens=conversation.settings_json.get("max_tokens", 4096),
+            model=model_name,
+            temperature=conversation.settings_json.get("temperature", 0.7) if conversation and conversation.settings_json else 0.7,
+            max_tokens=conversation.settings_json.get("max_tokens", 4096) if conversation and conversation.settings_json else 4096,
         )
 
         chunk_stream = provider.stream_response(req)

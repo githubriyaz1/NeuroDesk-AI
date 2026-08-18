@@ -157,8 +157,6 @@ export const ChatProvider = ({ children }) => {
           }
         },
       });
-
-      setAttachedAssets([]);
     } catch (err) {
       console.error('Failed to send streaming message:', err);
       setIsSending(false);

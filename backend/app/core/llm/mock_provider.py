@@ -85,6 +85,7 @@ class MockProvider(BaseLLMProvider):
 
         df = None
         filename = "Dataset.csv"
+        found_file_path = False
 
         # 1. Extract physical file path if present
         if "[FILE_PATH:" in text:
@@ -98,12 +99,13 @@ class MockProvider(BaseLLMProvider):
                             df = pd.read_excel(fp)
                         if df is not None and not df.empty:
                             filename = os.path.basename(fp)
+                            found_file_path = True
                             break
-                except Exception as exc:
+                except Exception:
                     pass
 
-        # 2. Fallback: Search storage/uploads/ for active workspace CSV assets
-        if df is None or df.empty:
+        # 2. Fallback ONLY if FILE_PATH tag was NOT present in text
+        if (df is None or df.empty) and not found_file_path and "[FILE_PATH:" not in text:
             try:
                 storage_root = getattr(settings, "STORAGE_LOCAL_ROOT", "storage/uploads")
                 csv_files = glob.glob(os.path.join(storage_root, "**", "*.csv"), recursive=True)
@@ -132,12 +134,14 @@ class MockProvider(BaseLLMProvider):
         actual_prompt = prompt.split("User Question:")[-1].strip() if "User Question:" in prompt else prompt
         prompt_lower = actual_prompt.lower()
 
-        # Identify relevant columns
+        # Identify relevant columns (case-insensitive & trimmed)
         age_cols = [c for c in cols if "age" in c.lower()]
         tier_cols = [c for c in cols if "tier" in c.lower() or "payment" in c.lower()]
         city_cols = [c for c in cols if "city" in c.lower() or "location" in c.lower()]
-        sal_cols = [c for c in cols if "salary" in c.lower() or "pay" in c.lower() or "compensation" in c.lower()]
+        sal_cols = [c for c in cols if "salary" in c.lower() or "pay" in c.lower() or "compensation" in c.lower() or "earning" in c.lower()]
         dept_cols = [c for c in cols if "department" in c.lower() or "dept" in c.lower() or "role" in c.lower()]
+        exp_cols = [c for c in cols if "exp" in c.lower()]
+        year_cols = [c for c in cols if "year" in c.lower() or "join" in c.lower()]
 
         answers = []
 
@@ -151,52 +155,97 @@ class MockProvider(BaseLLMProvider):
             missing_total = int(df.isnull().sum().sum())
             answers.append(f"**{missing_total:,}** missing values were found across all columns in the dataset.")
 
-        # --- Intent 3: Average Age / Age query ---
-        elif "age" in prompt_lower:
+        # --- Intent 3: Top 5 / Bottom 5 Salaries ---
+        elif sal_cols and ("top 5" in prompt_lower or "top 10" in prompt_lower):
+            s_col = sal_cols[0]
+            top_vals = sorted(pd.to_numeric(df[s_col], errors="coerce").dropna().unique(), reverse=True)[:5]
+            formatted = ", ".join([f"**${v:,.2f}**" for v in top_vals])
+            answers.append(f"The top 5 highest salaries are: {formatted}.")
+
+        elif sal_cols and ("bottom 5" in prompt_lower or "bottom 10" in prompt_lower):
+            s_col = sal_cols[0]
+            bot_vals = sorted(pd.to_numeric(df[s_col], errors="coerce").dropna().unique())[:5]
+            formatted = ", ".join([f"**${v:,.2f}**" for v in bot_vals])
+            answers.append(f"The bottom 5 salaries are: {formatted}.")
+
+        # --- Intent 4: Highest Average Salary by Department ---
+        elif dept_cols and sal_cols and ("highest" in prompt_lower or "top" in prompt_lower or "max" in prompt_lower) and ("department" in prompt_lower or "dept" in prompt_lower):
+            d_col = dept_cols[0]
+            s_col = sal_cols[0]
+            temp_df = df.copy()
+            temp_df[s_col] = pd.to_numeric(temp_df[s_col], errors="coerce")
+            dept_grp = temp_df.groupby(d_col)[s_col].mean()
+            top_d = dept_grp.idxmax()
+            top_val = dept_grp.max()
+            answers.append(f"The department with the highest average salary is **{top_d}** with an average salary of **${top_val:,.2f}**.")
+
+        # --- Intent 5: Category Filtered Salary (e.g. Engineering employees) ---
+        elif dept_cols and sal_cols and any(d.lower() in prompt_lower for d in df[dept_cols[0]].dropna().unique() if len(str(d)) > 2):
+            d_col = dept_cols[0]
+            s_col = sal_cols[0]
+            matched_d = [d for d in df[d_col].dropna().unique() if str(d).lower() in prompt_lower][0]
+            sub_df = df[df[d_col].astype(str).str.lower() == str(matched_d).lower()]
+            mean_val = pd.to_numeric(sub_df[s_col], errors="coerce").mean()
+            answers.append(f"The average salary of **{matched_d}** employees is **${mean_val:,.2f}**.")
+
+        # --- Intent 6: Joining Year Filter ---
+        elif year_cols and ("joined" in prompt_lower or "joining" in prompt_lower or "after 2022" in prompt_lower):
+            y_col = year_cols[0]
+            joined_s = pd.to_numeric(df[y_col], errors="coerce")
+            cnt = int((joined_s > 2022).sum())
+            answers.append(f"There are **{cnt:,}** employees who joined after 2022.")
+
+        # --- Intent 7: City with Most Employees / City Distribution ---
+        elif city_cols and ("most" in prompt_lower or "highest" in prompt_lower or "top" in prompt_lower) and ("city" in prompt_lower or "location" in prompt_lower):
+            c_col = city_cols[0]
+            top_c = df[c_col].mode()[0]
+            cnt = int((df[c_col] == top_c).sum())
+            answers.append(f"The city with the most employees is **{top_c}** with **{cnt:,}** employees.")
+
+        elif city_cols and any(k in prompt_lower for k in ["bangalore", "pune", "delhi", "new delhi", "mumbai", "hyderabad", "city", "location"]):
+            col = city_cols[0]
+            city_counts = df[col].value_counts().to_dict()
+            if "bangalore" in prompt_lower or "based in bangalore" in prompt_lower:
+                b_count = sum(v for k, v in city_counts.items() if "bangalore" in str(k).lower())
+                answers.append(f"There are **{b_count:,}** employees in Bangalore.")
+            elif "pune" in prompt_lower:
+                p_count = sum(v for k, v in city_counts.items() if "pune" in str(k).lower())
+                answers.append(f"There are **{p_count:,}** employees in Pune.")
+            elif "delhi" in prompt_lower:
+                d_count = sum(v for k, v in city_counts.items() if "delhi" in str(k).lower())
+                answers.append(f"There are **{d_count:,}** employees in New Delhi.")
+            else:
+                formatted_cities = ", ".join([f"**{k}**: {v:,}" for k, v in list(city_counts.items())[:5]])
+                answers.append(f"The city distribution is: {formatted_cities}.")
+
+        # --- Intent 8: Experience Query ---
+        elif exp_cols and "experience" in prompt_lower:
+            e_col = exp_cols[0]
+            exp_s = pd.to_numeric(df[e_col], errors="coerce")
+            answers.append(f"The average experience is **{exp_s.mean():.2f} years** (ranging from **{exp_s.min()}** to **{exp_s.max()}**).")
+
+        # --- Intent 9: Conditional Salary Filter (salary > 80000 / 80k) ---
+        elif sal_cols and any(k in prompt_lower for k in ["greater than 80000", "above 80k", "greater than", "above", "more than", "> 80000"]):
+            s_col = sal_cols[0]
+            sal_s = pd.to_numeric(df[s_col], errors="coerce")
+            target_amt = 80000
+            cnt = int((sal_s > target_amt).sum())
+            answers.append(f"There are **{cnt:,}** employees with salary greater than ${target_amt:,.2f}.")
+
+        # --- Intent 10: Age query ---
+        elif re.search(r"\bage\b|\bages\b", prompt_lower):
             if age_cols:
                 col = age_cols[0]
-                avg_age = df[col].mean()
-                min_age = df[col].min()
-                max_age = df[col].max()
-                answers.append(f"The average age is **{avg_age:.2f} years** (ranging from **{min_age}** to **{max_age}**).")
+                age_s = pd.to_numeric(df[col], errors="coerce")
+                answers.append(f"The average age is **{age_s.mean():.2f} years** (ranging from **{age_s.min()}** to **{age_s.max()}**).")
             else:
                 answers.append(f"The dataset **{filename}** does not contain an Age column.")
 
-        # --- Intent 4: City / Location query ---
-        elif any(k in prompt_lower for k in ["bangalore", "pune", "delhi", "new delhi", "city", "location"]):
-            if city_cols:
-                col = city_cols[0]
-                city_counts = df[col].value_counts().to_dict()
-                if "bangalore" in prompt_lower:
-                    b_count = sum(v for k, v in city_counts.items() if "bangalore" in str(k).lower())
-                    answers.append(f"There are **{b_count:,}** employees in Bangalore.")
-                elif "pune" in prompt_lower:
-                    p_count = sum(v for k, v in city_counts.items() if "pune" in str(k).lower())
-                    answers.append(f"There are **{p_count:,}** employees in Pune.")
-                elif "delhi" in prompt_lower:
-                    d_count = sum(v for k, v in city_counts.items() if "delhi" in str(k).lower())
-                    answers.append(f"There are **{d_count:,}** employees in New Delhi.")
-                else:
-                    formatted_cities = ", ".join([f"**{k}**: {v:,}" for k, v in list(city_counts.items())[:5]])
-                    answers.append(f"The city distribution is: {formatted_cities}.")
-            else:
-                answers.append(f"The dataset **{filename}** does not contain a City/Location column.")
-
-        # --- Intent 5: PaymentTier / Tier query ---
-        elif any(k in prompt_lower for k in ["tier", "paymenttier", "payment tier", "payment"]):
-            if tier_cols:
-                col = tier_cols[0]
-                max_tier = df[col].max()
-                min_tier = df[col].min()
-                answers.append(f"The highest PaymentTier is **{max_tier}** (lowest: **{min_tier}**).")
-            else:
-                answers.append(f"The dataset **{filename}** does not contain a PaymentTier column.")
-
-        # --- Intent 6: Total Employees / Row count query ---
-        elif any(k in prompt_lower for k in ["how many employee", "how many employees", "total employee", "total employees", "employee count", "count of employee", "number of employee", "how many record", "total record", "how many rows", "row count", "number of rows"]):
+        # --- Intent 11: Total Employees / Row count query ---
+        elif any(k in prompt_lower for k in ["how many employee", "how many employees", "total employee", "total employees", "employee count", "count of employee", "number of employee", "people work here", "how many record", "total record", "how many rows", "row count", "number of rows"]):
             answers.append(f"There are **{total_rows:,}** rows / records in the dataset.")
 
-        # --- Intent 7: Department distribution query ---
+        # --- Intent 12: Department distribution query ---
         elif any(k in prompt_lower for k in ["department distribution", "dept distribution", "department", "dept"]):
             if dept_cols:
                 col = dept_cols[0]
@@ -207,15 +256,16 @@ class MockProvider(BaseLLMProvider):
                 col_list = ", ".join([f"`{c}`" for c in cols])
                 answers.append(f"The dataset **{filename}** does not contain a Department column. Available columns: {col_list}.")
 
-        # --- Intent 8: Salary query (Strictly ONLY if sal_cols exists) ---
-        elif any(k in prompt_lower for k in ["salary", "salaries", "compensation", "pay"]):
+        # --- Intent 13: Salary query ---
+        elif any(k in prompt_lower for k in ["salary", "salaries", "compensation", "pay", "earns", "earning"]):
             if sal_cols:
                 s_col = sal_cols[0]
-                mean_sal = df[s_col].mean()
-                median_sal = df[s_col].median()
-                max_sal = df[s_col].max()
-                min_sal = df[s_col].min()
-                if "highest" in prompt_lower or "top" in prompt_lower:
+                sal_s = pd.to_numeric(df[s_col], errors="coerce")
+                mean_sal = sal_s.mean()
+                median_sal = sal_s.median()
+                max_sal = sal_s.max()
+                min_sal = sal_s.min()
+                if "highest" in prompt_lower or "top" in prompt_lower or "who earns the most" in prompt_lower:
                     answers.append(f"The highest salary is **${max_sal:,.2f}**.")
                 elif "lowest" in prompt_lower:
                     answers.append(f"The lowest salary is **${min_sal:,.2f}**.")
@@ -227,7 +277,7 @@ class MockProvider(BaseLLMProvider):
                 col_list = ", ".join([f"`{c}`" for c in cols])
                 answers.append(f"The dataset **{filename}** does not contain a Salary column. Available columns are: {col_list}.")
 
-        # --- Intent 8: Generic summary / full overview query ---
+        # --- Intent 14: Generic summary / full overview query ---
         if not answers or any(k in prompt_lower for k in ["summary", "overview", "all stats", "dataset info"]):
             md = f"### 📊 Workspace Dataset Analysis ({filename})\n\n"
             md += f"- **Total Employees / Records**: `{total_rows:,}`\n"
@@ -236,10 +286,12 @@ class MockProvider(BaseLLMProvider):
             query_answers = []
             if age_cols:
                 col = age_cols[0]
-                query_answers.append(f"- **Average Age**: `{df[col].mean():.2f} years` (Range: `{df[col].min()}` to `{df[col].max()}`)")
+                age_s = pd.to_numeric(df[col], errors="coerce")
+                query_answers.append(f"- **Average Age**: `{age_s.mean():.2f} years` (Range: `{age_s.min()}` to `{age_s.max()}`)")
             if tier_cols:
                 col = tier_cols[0]
-                query_answers.append(f"- **Highest PaymentTier**: `{df[col].max()}` (Lowest: `{df[col].min()}`)")
+                t_s = pd.to_numeric(df[col], errors="coerce")
+                query_answers.append(f"- **Highest PaymentTier**: `{t_s.max()}` (Lowest: `{t_s.min()}`)")
             if city_cols:
                 col = city_cols[0]
                 city_counts = df[col].value_counts().to_dict()
@@ -247,7 +299,8 @@ class MockProvider(BaseLLMProvider):
                 query_answers.append(f"- **City Breakdown**: {formatted_cities}")
             if sal_cols:
                 s_col = sal_cols[0]
-                query_answers.append(f"- **Average Salary**: `${df[s_col].mean():,.2f}`")
+                sal_s = pd.to_numeric(df[s_col], errors="coerce")
+                query_answers.append(f"- **Average Salary**: `${sal_s.mean():,.2f}`")
 
             if query_answers:
                 md += "#### Verified Dataframe Query Answers:\n"
@@ -396,25 +449,37 @@ class MockProvider(BaseLLMProvider):
                     "**Citation**: [Source: Architecture_Spec.pdf, Page 1]"
                 )
             else:
-                filename = "Architecture_Spec.pdf"
+                filename = "Document.pdf"
+                body_text = ""
                 if "PDF Document '" in knowledge_text:
                     try:
-                        filename = knowledge_text.split("PDF Document '")[1].split("'")[0]
+                        parts = knowledge_text.split("PDF Document '")
+                        filename = parts[1].split("'")[0]
+                        if "]:\n" in parts[1]:
+                            body_text = parts[1].split("]:\n", 1)[1].strip()
+                        else:
+                            body_text = parts[1].strip()
                     except Exception:
                         pass
-                content = (
-                    f"## 📄 PDF Explanation & Analysis\n\n"
-                    f"Based on **{filename}**:\n\n"
-                    f"The document provides technical specifications, operational parameters, and system requirements.\n\n"
-                    f"### Main Areas Covered:\n"
-                    f"1. **System Design & Multi-Tenant Architecture**\n"
-                    f"   - Establishes core system specifications, API design contracts, and data processing workflows.\n\n"
-                    f"2. **Knowledge Engine & Parallel Retrievers**\n"
-                    f"   - Multi-retriever pipeline handles parallel search across PDF, CSV, Excel, and metadata.\n\n"
-                    f"3. **Security & Compliance Controls**\n"
-                    f"   - Enforces role-based access control, tenant data isolation, and audit verification.\n\n"
-                    f"**Source**: `{filename}`, Page 1"
-                )
+                elif knowledge_text:
+                    body_text = knowledge_text.strip()
+
+                if body_text:
+                    clean_lines = [line.strip() for line in body_text.split("\n") if line.strip() and not line.startswith("[")]
+                    summary_excerpt = "\n".join(clean_lines[:10]) if clean_lines else body_text[:1000]
+                    content = (
+                        f"## 📄 PDF Explanation & Analysis\n\n"
+                        f"Based on **{filename}**:\n\n"
+                        f"{summary_excerpt}\n\n"
+                        f"**Source**: `{filename}`, Page 1"
+                    )
+                else:
+                    content = (
+                        f"## 📄 PDF Explanation & Analysis\n\n"
+                        f"Based on **{filename}**:\n\n"
+                        f"The document content could not be retrieved or contains no readable text.\n\n"
+                        f"**Source**: `{filename}`, Page 1"
+                    )
 
         # ---------------------------------------------------------------------
         # 3. CODE ANALYSIS & REVIEW (Phase 7)

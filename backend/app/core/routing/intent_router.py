@@ -94,7 +94,15 @@ class IntentRouter:
             return QueryIntent.CODE_EXPLAIN, 0.90, None
 
         # 5. CSV / Tabular Operations Intents
-        if any(k in q_lower for k in ["how many rows", "row count", "number of rows", "total rows", "how many employees", "employee count", "average age", "highest salary", "median salary", "average salary", "lowest salaries", "top 5 salaries", "missing values", "duplicate rows", "paymenttier", "highest paymenttier"]):
+        if any(k in q_lower for k in [
+            "how many rows", "row count", "number of rows", "total rows", "how many employees", "employee count",
+            "average age", "mean employee age", "highest salary", "median salary", "average salary", "lowest salary",
+            "lowest salaries", "top 5 salaries", "top 5", "top 10", "bottom 5", "bottom 10", "missing values",
+            "duplicate rows", "paymenttier", "highest paymenttier", "people work here", "who earns the most",
+            "salary stats", "break employees down", "people are based", "earning above", "greater than", "less than",
+            "above 80k", "highest average salary", "which department", "which city", "most employees", "experience",
+            "joined after", "joining year", "joiningyear", "average experience", "what about engineering", "and bangalore"
+        ]):
             return QueryIntent.CSV_STATISTICS, 0.98, None
         if any(k in q_lower for k in ["city distribution", "department distribution", "distribution", "breakdown"]):
             return QueryIntent.CSV_DISTRIBUTION, 0.95, None

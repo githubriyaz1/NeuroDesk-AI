@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.analysis import analysis_engine
 from app.core.knowledge import knowledge_engine
+from app.core.config import settings
 from app.core.llm.base import ProviderRequest
 from app.core.logging import logger
 from app.core.project_generator import project_generation_engine
@@ -172,16 +173,28 @@ class AIChatService:
 
     async def create_conversation(self, db: AsyncSession, owner_id: UUID, data_in: ConversationCreate) -> ConversationResponse:
         title = data_in.title or "New Conversation"
+        configured_provider = getattr(settings, "LLM_PROVIDER", "mock")
+        configured_model = (
+            getattr(settings, "LLM_MODEL", "gemini-2.5-flash")
+            if configured_provider == "gemini"
+            else "neurodesk-mock-v1"
+        )
         default_settings = {
-            "model": "neurodesk-mock-v1",
+            "model": configured_model,
             "temperature": 0.7,
             "max_tokens": 4096,
             "system_prompt": "You are NeuroDesk AI, an intelligent workspace assistant.",
+        }
+        default_provider_info = {
+            "provider": configured_provider,
+            "api_version": "v1",
+            "is_explicit": False,
         }
         conv_data = {
             "title": title,
             "description": data_in.description,
             "settings_json": data_in.settings_json or default_settings,
+            "provider_info_json": getattr(data_in, "provider_info_json", None) or default_provider_info,
         }
         conversation = await conversation_repo.create(db, owner_id, conv_data)
         logger.info(f"Created new conversation '{conversation.title}' [{conversation.id}] for user [{owner_id}]")

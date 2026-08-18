@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.llm.streaming import cancellation_manager, stream_cache
 from app.core.logging import logger
 from app.database.session import get_db
@@ -83,7 +84,16 @@ async def stream_chat_response(
 
     history = await message_repo.list_messages(db, conversation_id)
     provider_info = conv.provider_info_json or {}
-    provider_name = provider_info.get("provider") or getattr(settings, "LLM_PROVIDER", "mock")
+    raw_provider = provider_info.get("provider")
+    is_explicit = provider_info.get("is_explicit", False)
+    configured_provider = getattr(settings, "LLM_PROVIDER", "mock")
+
+    if is_explicit and raw_provider:
+        provider_name = raw_provider
+    elif configured_provider and configured_provider != "mock":
+        provider_name = configured_provider
+    else:
+        provider_name = raw_provider or configured_provider or "mock"
 
     # 4. Query Knowledge Engine for grounding context if available
     knowledge_context = None
@@ -96,7 +106,7 @@ async def stream_chat_response(
             owner_id=current_user.id,
             req=KnowledgeQueryRequest(
                 query=msg_in.prompt,
-                asset_ids=msg_in.attached_assets if msg_in.attached_assets is not None else None,
+                asset_ids=msg_in.attached_assets if (msg_in.attached_assets and len(msg_in.attached_assets) > 0) else None,
                 limit=3,
             ),
             db_session=db,
@@ -104,6 +114,18 @@ async def stream_chat_response(
         if k_res and k_res.citations:
             knowledge_context = k_res.packaged_context
             citations = [c.model_dump(mode="json") for c in k_res.citations]
+
+        unique_kw = "NEURODESK_UNIQUE_84729"
+        contains_kw = unique_kw in (knowledge_context or "")
+        logger.info(
+            f"[PDF_DEBUG]\n"
+            f"query={msg_in.prompt}\n"
+            f"attached_assets={msg_in.attached_assets}\n"
+            f"retrieved_docs_count={len(citations) if citations else 0}\n"
+            f"knowledge_context_length={len(knowledge_context) if knowledge_context else 0}\n"
+            f"knowledge_context_contains_unique_keyword={contains_kw}\n"
+            f"provider={provider_name}"
+        )
     except Exception as exc:
         logger.warning(f"Knowledge Engine retrieval skipped for chat prompt: {exc}")
 
